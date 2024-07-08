@@ -1,17 +1,10 @@
 <template>
-  <!-- <PageParty/> -->
-   <GlobalChessPage/>
+   <router-view/>
 </template>
 
 <script>
-// import PageParty from './Pages/GoToPartyPage.vue';
-import GlobalChessPage from './Pages/GlobalChessPage.vue';
 export default {
-  name: 'App',
-  components: {
-    // PageParty
-    GlobalChessPage
-  }
+  name: 'App'
 }
 </script>
 

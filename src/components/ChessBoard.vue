@@ -1,73 +1,125 @@
 <template>
   <div class="chessboard">
     <div>
-      <Players :avatarUrl="profilPlayer1" playerName="Tix" :turn="currentPlayer === 'black'"/>
+      <Players
+        :avatar-url="profilPlayer1"
+        player-name="Tix"
+        :turn="currentPlayer === 'black'"
+      />
     </div>
     <!-- Chronomètres en haut -->
-    <div class="timer" :class="{ paused: !topTimerRunning }">
+    <div
+      class="timer"
+      :class="{ paused: !topTimerRunning }"
+    >
       <span class="digital-clock">{{ formatTime(blackTime) }}</span>
     </div>
     <!-- L'échiquier avec les cellules et pièces -->
-      <div class="board">
+    <div class="board">
       <!-- Lettres verticales (A à H) -->
       <div class="letters">
-        <div v-for="(row, rowIndex) in board" :key="rowIndex" class="letter">{{ String.fromCharCode(65 + rowIndex) }}</div>
+        <div
+          v-for="(row, rowIndex) in board"
+          :key="rowIndex"
+          class="letter"
+        >
+          {{ String.fromCharCode(65 + rowIndex) }}
+        </div>
       </div>
 
-      <div v-for="(row, rowIndex) in board" :key="rowIndex" class="row">
+      <div
+        v-for="(row, rowIndex) in board"
+        :key="rowIndex"
+        class="row"
+      >
         <!-- Numéros horizontaux (0 à 7) -->
-        <div class="number">{{ rowIndex }}</div>
+        <div class="number">
+          {{ rowIndex }}
+        </div>
 
-        <div v-for="(cell, colIndex) in row" :key="colIndex" :class="['cell', getCellColor(rowIndex, colIndex), isSelected(rowIndex, colIndex) ? 'selected' : '']" @click="handleCellClick(rowIndex, colIndex)">
-          <img v-if="cell" :src="getPieceImage(cell)" :class="imageClass" alt="pièces"/>
+        <div
+          v-for="(cell, colIndex) in row"
+          :key="colIndex"
+          :class="['cell', getCellColor(rowIndex, colIndex), isSelected(rowIndex, colIndex) ? 'selected' : '']"
+          @click="handleCellClick(rowIndex, colIndex)"
+        >
+          <img
+            v-if="cell"
+            :src="getPieceImage(cell)"
+            :class="imageClass"
+            alt="pièces"
+          >
         </div>
       </div>
     </div>
 
-     <!-- Chronomètre en bas -->
-    <div class="timer" :class="{ paused: !bottomTimerRunning }">
+    <!-- Chronomètre en bas -->
+    <div
+      class="timer"
+      :class="{ paused: !bottomTimerRunning }"
+    >
       <span class="digital-clock">{{ formatTime(whiteTime) }}</span>
     </div>
 
     <div>
-      <Players :avatarUrl="profilPlayer1" playerName="janny" :turn="currentPlayer === 'white'"/>
+      <Players
+        :avatar-url="profilPlayer1"
+        player-name="janny"
+        :turn="currentPlayer === 'white'"
+      />
     </div>
 
     <div>
-      <DialogChessMate v-model="showDialog" />
+      <DialogChessMate
+        v-model:open="showDialog"
+        :chess-mate="true"
+      />
     </div>
 
     <div>
-      <v-dialog v-model="dialogPromated" max-width="400px">
-          <v-card>
-            <v-card-title>
-              Sélectionnez une promotion
-            </v-card-title>
-            <v-card-text>
-             <div class="promotion-options">
-                <v-btn
-                  v-for="(promotion, index) in promate"
-                  :key="index"
-                  @click="promotePawn(rowPromoted, colPromoted, promotion.piece); dialogPromated = false"
-                  class="promotion-btn"
-                  height="60"
-                  width="60"
-                >
-                  <v-img :src="promotion.image" class="promotion-image" alt="logo"></v-img>
-                </v-btn>
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-dialog>
+      <v-dialog
+        v-model="dialogPromated"
+        max-width="400px"
+      >
+        <v-card>
+          <v-card-title>
+            Sélectionnez une promotion
+          </v-card-title>
+          <v-card-text>
+            <div class="promotion-options">
+              <v-btn
+                v-for="(promotion, index) in promate"
+                :key="index"
+                class="promotion-btn"
+                height="60"
+                width="60"
+                @click="promotePawn(rowPromoted, colPromoted, promotion.piece); dialogPromated = false"
+              >
+                <v-img
+                  :src="promotion.image"
+                  class="promotion-image"
+                  alt="logo"
+                />
+              </v-btn>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-dialog>
     </div>
-    <audio id="whiteCheckAudio" :src="audioWchess"></audio>
-    <audio id="blackCheckAudio" :src="audioBchess"></audio>
+    <audio
+      id="whiteCheckAudio"
+      :src="audioWchess"
+    />
+    <audio
+      id="blackCheckAudio"
+      :src="audioBchess"
+    />
   </div>
-
 </template>
 
 <script>
-import { getKnightMoves } from '@/utils/api';
+import { getBishopMoves, getKingMoves, getKingRookMoves, getKnightMoves, getPawnsMoves, getRookMoves } from '@/utils/movesApi';
+import { getPartybyId } from '@/utils/partyApi';
 import DialogChessMate from './DialogChessMate.vue';
 import Players from './Players.vue';
 
@@ -102,13 +154,27 @@ export default {
       dialogPromated: false,
       promate : [],
       rowPromoted: 0,
-      colPromoted : 0
+      colPromoted: 0,
+      kingAlreadyMoves: false,
+      lastMove : null
     };
   },
   computed: {
     imageClass() {
       return this.isMobile ? 'mobile-image' : 'web-image';
     }
+  },
+  async mounted() {
+      const color = 'white';
+      this.toggleTimer(color)
+      window.addEventListener('resize', this.checkPlatform);
+      const party = await getPartybyId(14)
+      console.log("🚀 ~ party:", party)
+  },
+  beforeUnmount() {
+    window.removeEventListener('resize', this.checkPlatform);
+    clearInterval(this.topInterval);
+    clearInterval(this.bottomInterval);
   },
   methods: {
     createBoard() {
@@ -127,7 +193,11 @@ export default {
     formatTime(seconds) {
       const minutes = Math.floor(seconds / 60);
       const remainingSeconds = seconds % 60;
-      return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
+      const time = `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`
+      if (time === '0:00') {
+        console.log("🚀 ~ defaite pour :", this.currentPlayer)
+      }
+      return time;
     },
     toggleTimer(playerColor) {
       this.currentPlayer === 'white' ? this.topTimerRunning = true : this.topTimerRunning = false;
@@ -180,21 +250,21 @@ export default {
       };
       return pieceImages[piece];
     },
-    handleCellClick(row, col) {
+    async handleCellClick(row, col) {
       const selectedPiece = this.board[row][col];
       if (this.selectedPiece) {
         if (this.validMoves.some(move => move[0] === row && move[1] === col)) {
           this.movePiece(this.selectedPiece, [row, col]);
           this.currentPlayer = this.currentPlayer === 'white' ? 'black' : 'white'; // Switch turn
           console.log("🚀 ~ au tour du : ", this.currentPlayer)
-          this.checkForCheck();
+          await this.checkForCheck();
           this.toggleTimer(this.currentPlayer)
         }
         this.selectedPiece = null;
         this.validMoves = [];
       } else if (selectedPiece) {
         this.selectedPiece = [row, col];
-        this.validMoves = this.getValidMoves(row, col);
+        this.validMoves = await this.getValidMoves(row, col);
       }
     },
     movePiece(from, to) {
@@ -202,6 +272,10 @@ export default {
       const [toRow, toCol] = to;
       this.board[toRow][toCol] = this.board[fromRow][fromCol];
       this.board[fromRow][fromCol] = '';
+      this.lastMove = {
+        from: [fromRow, fromCol],
+        to : [toRow, toCol]
+      }
     },
     // Verification pour pouvoir faire un roque
     isValidKingsideCastling(isWhite) {
@@ -234,7 +308,7 @@ export default {
       }
     },
     // echec au roi
-    checkForCheck() {
+    async checkForCheck() {
       const whiteKingPosition = this.findKing('K');
       const blackKingPosition = this.findKing('k');
 
@@ -242,7 +316,7 @@ export default {
       const blackCheckAudio = document.getElementById('blackCheckAudio');
 
       if (this.isSquareUnderAttack(whiteKingPosition, 'black')) {
-        if (this.isCheckmate('white')) {
+        if (await this.isCheckmate('white')) {
           this.showDialog = true
         } else {
           whiteCheckAudio.play();
@@ -250,7 +324,7 @@ export default {
         return true;
       }
       if (this.isSquareUnderAttack(blackKingPosition, 'white')) {
-        if (this.isCheckmate('black')) {
+        if (await this.isCheckmate('black')) {
           this.showDialog = true
         } else {
           blackCheckAudio.play();
@@ -371,9 +445,9 @@ export default {
       return false;
     },
     // echec est mate
-    isCheckmate(color) {
+    async isCheckmate(color) {
       const kingPosition = this.findKing(color === 'white' ? 'K' : 'k');
-      const possibleMoves = this.getAllPossibleMoves(color);
+      const possibleMoves = await this.getAllPossibleMoves(color);
 
       for (const move of possibleMoves) {
         const tempBoard = JSON.parse(JSON.stringify(this.board));
@@ -386,16 +460,14 @@ export default {
       }
       return true;
     },
-    getAllPossibleMoves(color) {
+    async getAllPossibleMoves(color) {
       const moves = [];
       for (let y = 0; y < this.board.length; y++) {
         for (let x = 0; x < this.board[y].length; x++) {
           const piece = this.board[y][x];
           if (piece !== '' && this.isOpponentPieces(piece, color)) {
-            const pieceMoves = this.getValidMoves(y, x);
+            const pieceMoves = await this.getValidMoves(y, x);
             for (const move of pieceMoves) {
-              console.log("🚀 ~ piece:", piece)
-              console.log("🚀 ~ move:", move)
               moves.push({ from: { x, y }, to: { y: move[0], x: move[1] } });
             }
           }
@@ -416,17 +488,34 @@ export default {
       const isWhite = piece === piece.toUpperCase();
       return (color === 'white' && isWhite) || (color === 'black' && !isWhite);
     },
-    // Check if the piece at given row and column is opponent's piece
-    isOpponentPiecePawn(row, col, isWhite) {
-      const piece = this.board[row][col];
-      return piece !== '' && (isWhite ? piece.toLowerCase() === piece : piece.toUpperCase() === piece);
-    },
     //Selection des cases
     isSelected(row, col) {
       // Check if the cell at given row and column is selected
       return this.selectedPiece && this.selectedPiece[0] === row && this.selectedPiece[1] === col;
     },
-    getValidMoves(row, col) {
+    enPassant(row, col, isWhite) {
+     const direction = isWhite ? 1 : -1;
+     if (this.lastMove) {
+        const [lastFromRow, lastFromCol] = this.lastMove.from;
+        const [lastToRow, lastToCol] = this.lastMove.to;
+        // Vérifiez si le dernier mouvement était un déplacement de deux cases pour un pion adverse
+        if (Math.abs(lastFromRow - lastToRow) === 2 && this.board[lastToRow][lastToCol].toLowerCase() === 'p') {
+          // Vérifiez si le pion adverse est à côté de notre pion
+          if (lastToRow === row && Math.abs(lastToCol - col) === 1) {
+            // Capture en passant
+            if (Math.abs(lastToCol - lastFromCol) !== 1 && this.board[lastToRow][lastToCol].toLowerCase() === 'p') {
+              setTimeout(() => {
+                if (this.board[lastFromRow - direction][lastFromCol].toLowerCase() === 'p') {
+                  this.board[lastToRow][lastToCol] = ''; // Retirer le pion capturé
+                }
+              }, 2500);
+            }
+            this.moves.push([row + direction, lastToCol]);
+          }
+        }
+      }
+    },
+    async getValidMoves(row, col) {
       const piece = this.board[row][col];
 
       if (!piece) return this.moves;
@@ -439,26 +528,29 @@ export default {
       }
 
       if (piece.toLowerCase() === 'p') {
-        this.moves = this.getPawnMoves(row, col, isWhite);
+        this.moves = await getPawnsMoves(row, col, isWhite, this.board, this.lastMove);
+        this.checkAndPromotePawn();
+        this.enPassant(row, col,isWhite)
       } else if (piece.toLowerCase() === 'r') {
-        this.moves = this.getRookMoves(row, col, isWhite);
+        this.moves = await getRookMoves(row, col, isWhite, this.board);
       } else if (piece.toLowerCase() === 'n') {
-        this.moves = this.getKnightMovesLocal(row, col, isWhite)
-        // console.log("🚀 ~ this.fetchMoves(row, col, isWhite, this.board):", this.fetchMoves(row, col, isWhite, this.board).then())
+        this.moves = await getKnightMoves(row, col, isWhite, this.board)
       } else if (piece.toLowerCase() === 'b') {
-        this.moves= this.getBishopMoves(row, col, isWhite);
+        this.moves = await getBishopMoves(row, col, isWhite, this.board);
       } else if (piece.toLowerCase() === 'q') {
-        this.moves = this.getQueenMoves(row, col, isWhite);
+        this.moves = await this.getQueenMoves(row, col, isWhite, this.board);
       } else if (piece.toLowerCase() === 'k') {
-        if (this.isValidKingsideCastling(isWhite)) {
-          this.moves = this.getKingRookMoves(row, col, 1, isWhite);
+                  console.log("🚀 ~ this.kingAlreadyMoves:", this.kingAlreadyMoves)
+
+        if (this.isValidKingsideCastling(isWhite) && !this.kingAlreadyMoves) {
+          this.moves = await getKingRookMoves(row, col, 1,this.kingMoved, isWhite, this.board);
           setTimeout(() => {
             if (this.board[row][6].toLowerCase() === 'k') {
               this.getTRookMoves(row)
             }
-          }, 3000);
-        } else if (this.isValidQueensideCastling(isWhite)) {
-          this.moves = this.getKingRookMoves(row, col, -1, isWhite);
+          }, 2500);
+        } else if (this.isValidQueensideCastling(isWhite) && !this.kingAlreadyMoves) {
+          this.moves = await getKingRookMoves(row, col, -1,this.kingMoved, isWhite, this.board);
           setTimeout(() => {
             if (this.board[row][2].toLowerCase() === 'k') {
               this.getTRookMoves(row)
@@ -466,45 +558,14 @@ export default {
            }, 2500);
 
         } else {
-          this.moves = this.getKingMoves(row, col, isWhite);
+          this.moves = await getKingMoves(row, col, isWhite, this.board);
+          this.kingAlreadyMoves = true
         }
       }
-
 
       return this.moves;
     },
     // Deplacement des pieces...
-    async fetchMoves(row,col,isWhite, board) {
-      try {
-         await getKnightMoves(row, col, isWhite, board);
-      } catch (error) {
-        console.error('Erreur lors de la récupération des mouvements du cavalier :', error);
-      }
-    },
-
-    getKingRookMoves(row, col, direction, isWhite) {
-       const moves = [];
-      // Vertical and horizontal directions
-      if (isWhite && !this.kingMoved.white || !isWhite && !this.kingMoved.black) {
-        for (let i = 1; i < 3; i++) {
-        let x = row;
-        let y = col + i * direction;
-          while (x === 0 || x === 7) {
-            if (this.board[x][y] === '') {
-              moves.push([x, y]);
-              break;
-            } else {
-              if (this.board[x][col].toUpperCase() !== this.board[x][y]) {
-                moves.push([x, y]);
-              }
-              break;
-            }
-          }
-        }
-      }
-      isWhite ? this.kingMoved.white = true : this.kingMoved.black = true;
-      return moves;
-    },
     getTRookMoves(row) {
       if (this.rookMoved.white.left && row === 0) {
         if (this.board[row][7] === 'R') {
@@ -561,136 +622,17 @@ export default {
       },2000)
 
     },
-    getPawnMoves(row, col, isWhite) {
-      // Get valid moves for a pawn
-
-      const moves = [];
-      const direction = isWhite ? 1 : -1;
-      const startRow = isWhite ? 1 : 6;
-
-     // Move forward one square
-      if (this.isOnBoard(row + direction, col) && this.board[row + direction][col] === '') {
-        moves.push([row + direction, col]);
-        // Move forward two squares from start position
-        if (row === startRow && this.board[row + 2 * direction][col] === '' && this.board[row + direction][col] === '') {
-          moves.push([row + 2 * direction, col]);
-        }
-      }
-      // Capture diagonally left
-      if (this.isOnBoard(row + direction, col - 1) && this.isOpponentPiecePawn(row + direction, col - 1, isWhite)) {
-        moves.push([row + direction, col - 1]);
-      }
-
-      // Capture diagonally right
-      if (this.isOnBoard(row + direction, col + 1) && this.isOpponentPiecePawn(row + direction, col + 1, isWhite)) {
-        moves.push([row + direction, col + 1]);
-      }
-
-      this.checkAndPromotePawn()
-
-      return moves;
-    },
-    getRookMoves(row, col, isWhite) {
-      const moves = [];
-      // Vertical and horizontal directions
-      const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-
-      for (const [dx, dy] of directions) {
-        let x = row + dx;
-        let y = col + dy;
-        while (x >= 0 && x < 8 && y >= 0 && y < 8) {
-          if (this.board[x][y] === '') {
-            moves.push([x, y]);
-          } else {
-            if (this.board[x][y].toUpperCase() !== this.board[x][y] === isWhite) {
-              moves.push([x, y]);
-            }
-            break;
-          }
-          x += dx;
-          y += dy;
-        }
-      }
-
-      return moves;
-    },
-    getKnightMovesLocal(row, col, isWhite) {
-      const moves = [];
-      const knightMoves = [
-        [2, 1], [2, -1], [-2, 1], [-2, -1],
-        [1, 2], [1, -2], [-1, 2], [-1, -2]
-      ];
-
-      for (const [dx, dy] of knightMoves) {
-        const x = row + dx;
-        const y = col + dy;
-        if (x >= 0 && x < 8 && y >= 0 && y < 8 && (this.board[x][y] === '' || this.board[x][y].toUpperCase() !== this.board[x][y] === isWhite)) {
-          moves.push([x, y]);
-        }
-      }
-      return moves;
-    },
-    getBishopMoves(row, col, isWhite) {
-      const moves = [];
-      // Diagonal directions
-      const directions = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
-
-      for (const [dx, dy] of directions) {
-        let x = row + dx;
-        let y = col + dy;
-        while (x >= 0 && x < 8 && y >= 0 && y < 8) {
-          if (this.board[x][y] === '') {
-            moves.push([x, y]);
-          } else {
-            if (this.board[x][y].toUpperCase() !== this.board[x][y] === isWhite) {
-              moves.push([x, y]);
-            }
-            break;
-          }
-          x += dx;
-          y += dy;
-        }
-      }
-
-      return moves;
-    },
-    getQueenMoves(row, col, isWhite) {
+    async getQueenMoves(row, col, isWhite, board) {
       // Queen is a combination of rook and bishop
       return [
-        ...this.getRookMoves(row, col, isWhite),
-        ...this.getBishopMoves(row, col, isWhite)
+        ...await getRookMoves(row, col, isWhite, board),
+        ...await getBishopMoves(row, col, isWhite, board)
       ];
-    },
-    getKingMoves(row, col, isWhite) {
-      const moves = [];
-      const kingMoves = [
-        [1, 0], [-1, 0], [0, 1], [0, -1],
-        [1, 1], [1, -1], [-1, 1], [-1, -1]
-      ];
-
-      for (const [dx, dy] of kingMoves) {
-        const x = row + dx;
-        const y = col + dy;
-        if (x >= 0 && x < 8 && y >= 0 && y < 8 && (this.board[x][y] === '' || this.board[x][y].toUpperCase() !== this.board[x][y] === isWhite)) {
-          moves.push([x, y]);
-        }
-      }
-      return moves;
     },
     checkPlatform() {
       this.isMobile = window.innerWidth <= 768;
     }
 
-  },
-   mounted() {
-      const color = 'white';
-      this.toggleTimer(color)
-      window.addEventListener('resize', this.checkPlatform);
-  },
-  beforeUnmount() {
-    window.removeEventListener('resize', this.checkPlatform);
-    clearInterval(this.topInterval);
-    clearInterval(this.bottomInterval);
   },
 };
 </script>

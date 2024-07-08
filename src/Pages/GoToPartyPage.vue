@@ -7,8 +7,8 @@
 </template>
 
 <script>
-import NavBarVue from '../components/ NavBar.vue';
 import ChessBoard from '../components/ChessBoard.vue';
+import NavBarVue from '../components/NavBar.vue';
 export default {
   name: 'PartyChess',
   components: {
