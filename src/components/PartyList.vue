@@ -15,7 +15,7 @@
       class="list"
     >
       <v-list-item-title>
-        <span class="text-h6">{{ party.name }} <span class="text-light text-caption">creer par {{ party.players[0].name || JSON }}</span> </span>
+        <span class="text-h6">{{ party.name }} <span class="text-medium-emphasis text-caption">creer par {{ party.players[0].name || JSON }}</span> </span>
       </v-list-item-title>
 
       <v-list-item-subtitle>
@@ -95,8 +95,9 @@ export default {
   methods:{
     handleWebSocketMessage(event) {
       this.message = JSON.parse(event.data); // Mettre à jour la donnée du message
-      this.partyLists = this.message.data
-      // Exécuter d'autres traitements en fonction du message reçu
+      if(this.message.event === 'newParty' ){
+        this.partyLists = this.message.data
+      }
     },
     playParty(id) {
       let user = this.user

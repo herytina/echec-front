@@ -2,15 +2,58 @@
   <div v-if="party">
     <NavBarVue bg-color="global" />
     <div>
-      <span>{{ party.name }}</span>
-    </div>
-    <div>
-      <span>Mise : {{ party.mise }} MGA</span>
-    </div>
-    <div>
-      En attente de joueur
+      <v-sheet
+        class="sheet pa-4 text-center mx-auto"
+        elevation="12"
+        max-width="600"
+        rounded="lg"
+        width="100%"
+      >
+        <v-card>
+          <v-card-title v-if="isFullPlayer">
+            Sélectionnez votre piece
+          </v-card-title>
+          <v-card-text v-if="isFullPlayer">
+            <div class="promotion-options">
+              <v-btn
+                v-for="(piece, index) in pieceChoise"
+                :key="index"
+                class="promotion-btn"
+                height="60"
+                width="60"
+                @click="choiseColor(piece.color);"
+              >
+                <v-img
+                  :src="piece.image"
+                  class="promotion-image"
+                  alt="logo"
+                />
+              </v-btn>
+            </div>
+          </v-card-text>
+          <v-card-text
+            v-if="!selectedPiece && isFullPlayer"
+            class="text-error"
+          >
+            Veuillez choisir une piece
+          </v-card-text>
+        </v-card>
+
+        <h2 class="text-h5 mb-6 mt-5">
+          Nom de votre partie : {{ party.name }}
+        </h2>
+
+        <p class="mb-4 text-medium-emphasis text-body-2">
+          Mise : <a
+            class="text-decoration-none text-info"
+            href="#"
+          >{{ party.mise }}</a>
+          MGA
+        </p>
+      </v-sheet>
     </div>
     <v-card
+      title="Joueurs"
       :text="party.players[0].name"
     />
 
@@ -19,27 +62,21 @@
       :text="party.players[1].name"
     />
 
-    <div
-      v-if="isFullPlayer"
-      class="btn"
-    >
-      <v-btn
-        color="#d2992f"
-        size="x-large"
-        variant="tonal"
-        class="text-none btn"
-        border
-        @click="letGame"
-      >
-        jouer
-      </v-btn>
-    </div>
+    <v-progress-circular
+      v-if="!isFullPlayer"
+      :size="70"
+      :width="7"
+      color="amber"
+      class="progress mt-5 mb-3"
+      indeterminate
+    />
   </div>
 </template>
 
 <script>
 import { usePartyStore } from '@/stores/party.store';
-import { getPartybyId } from '@/utils/partyApi';
+import { useStoreUser } from '@/stores/user.store';
+import { getPartybyId, updateParty } from '@/utils/partyApi';
 import NavBarVue from '../components/NavBar.vue';
 
 export default{
@@ -47,10 +84,21 @@ export default{
   components :{
     NavBarVue
   },
+  setup() {
+    const userStore = useStoreUser();
+    return {
+      user: userStore.user,
+    };
+  },
   data(){
     return{
       party:null,
-      isFullPlayer:false
+      isFullPlayer:false,
+      pieceChoise : [
+        {color:'white', image:require('@/assets/chess-p/white-king.svg')},
+        {color:'black',image:require('@/assets/chess-p/black-king.svg')}
+      ],
+      selectedPiece : false
     }
   },
   sockets: {
@@ -63,6 +111,8 @@ export default{
     message(data) {
       if (data.event === 'playIn') {
         this.party.push(data.data);
+      }else if(data.event === 'letsPlay'){
+        console.log("🚀 ~ data:", data)
       }
     },
   },
@@ -85,16 +135,75 @@ export default{
   methods:{
     handleWebSocketMessage(event) {
       this.message = JSON.parse(event.data); // Mettre à jour la donnée du message
-      this.party = this.message.data[0];
-      this.party.players.length === 2 ? this.isFullPlayer = true : this.isFullPlayer =false;
+      if(this.message.event === 'playIn'){
+        this.party = this.message.data[0];
+        this.party.players.length === 2 ? this.isFullPlayer = true : this.isFullPlayer =false;
+      }else if(this.message.event === 'letsPlay' && this.message.data.status === 'matching' && parseInt(this.message.data.id) === this.party.id){
+        this.$router.push({name:'PartyChess', query:{id:this.party.id}})
+      }
     },
-    letGame(){
-      this.$router.push({name:'PartyChess', query:{id:this.party.id}})
+    async choiseColor(color){
+      if(this.party.players.length === 2){
+        let player1
+        let player2
+        this.party.players.forEach(player => {
+          if(color === 'white'){
+            if(player.id === this.user.id){
+                player.piece = color
+                player1 = player
+            }else{
+                player.piece = 'black'
+                player2 = player
+            }
+          }
+          if(color === 'black'){
+            if(player.id === this.user.id){
+                player.piece = color
+                player1 = player
+            }else{
+                player.piece = 'white'
+                player2 = player
+            }
+          }
+        });
+         const players = [player1,player2]
+        await updateParty(this.party.id, JSON.stringify(players),'matching');
+        this.selectedPiece = true
+      }
+
     }
   }
 }
 </script>
 
 <style scoped>
-
+.progress{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: auto;
+}
+.btn{
+  width: 97%;
+  justify-content: center;
+  align-items: center;
+  margin: 5px;
+  z-index: 9999;
+}
+.sheet{
+  margin: 5px;
+}
+.promotion-options {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+.promotion-btn {
+  padding: 0;
+  margin: 0;
+}
+.promotion-image {
+  width: 50px;
+  height: 50px;
+}
 </style>

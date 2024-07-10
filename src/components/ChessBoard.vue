@@ -3,8 +3,8 @@
     <div>
       <Players
         :avatar-url="profilPlayer1"
-        player-name="Tix"
-        :turn="currentPlayer === 'black'"
+        :player-name="name = player1.piece ==='black' ? player1.name : player2.name"
+        :turn="currentPlayer.piece === 'black'"
       />
     </div>
     <!-- Chronomètres en haut -->
@@ -64,8 +64,8 @@
     <div>
       <Players
         :avatar-url="profilPlayer1"
-        player-name="janny"
-        :turn="currentPlayer === 'white'"
+        :player-name="name = player1.piece ==='white' ? player1.name : player2.name"
+        :turn="currentPlayer.piece === 'white'"
       />
     </div>
 
@@ -114,12 +114,49 @@
       id="blackCheckAudio"
       :src="audioBchess"
     />
+
+    <v-dialog
+      v-model="loading"
+      max-width="320"
+      persistent
+    >
+      <v-list
+        class="py-2"
+        color="primary"
+        elevation="12"
+        rounded="lg"
+      >
+        <v-list-item
+          prepend-icon="$vuetify-outline"
+          title="Chargement de la partie..."
+        >
+          <template #prepend>
+            <div class="pe-4">
+              <v-icon
+                color="primary"
+                size="x-large"
+              />
+            </div>
+          </template>
+
+          <template #append>
+            <v-progress-circular
+              color="primary"
+              indeterminate="disable-shrink"
+              size="16"
+              width="2"
+            />
+          </template>
+        </v-list-item>
+      </v-list>
+    </v-dialog>
   </div>
 </template>
 
 <script>
+import { useStoreUser } from '@/stores/user.store';
 import { getBishopMoves, getKingMoves, getKingRookMoves, getKnightMoves, getPawnsMoves, getRookMoves } from '@/utils/movesApi';
-import { getPartybyId } from '@/utils/partyApi';
+import { getPartybyId, updatePartyboard } from '@/utils/partyApi';
 import DialogChessMate from './DialogChessMate.vue';
 import Players from './Players.vue';
 
@@ -128,12 +165,18 @@ export default {
     DialogChessMate,
     Players
   },
+  setup() {
+    const userStore = useStoreUser();
+    return {
+      user: userStore.user,
+    };
+  },
   data() {
     return {
       board: this.createBoard(),
       selectedPiece: null,
       validMoves: [],
-      currentPlayer: 'white',
+      currentPlayer: {piece:"white"},
       kingMoved: { white: false, black: false },
       rookMoved: {
         white: { left: false, right: false },
@@ -156,7 +199,11 @@ export default {
       rowPromoted: 0,
       colPromoted: 0,
       kingAlreadyMoves: false,
-      lastMove : null
+      lastMove : null,
+      player1:{piece : 'white'},
+      player2:{piece : 'black'},
+      party:{},
+      loading:true
     };
   },
   computed: {
@@ -165,18 +212,47 @@ export default {
     }
   },
   async mounted() {
-      const color = 'white';
-      this.toggleTimer(color)
+      const id = this.$route.query.id;
       window.addEventListener('resize', this.checkPlatform);
-      const party = await getPartybyId(14)
-      console.log("🚀 ~ party:", party)
+      this.party = await getPartybyId(id)
+      setTimeout(() => {
+        if(this.party) {
+          this.player1 =  this.party.players[0]
+          this.player2 =  this.party.players[1]
+          this.party.players.forEach( player =>{
+            if(player.id === this.user.id && player.piece === 'white'){
+              this.currentPlayer = player
+            }
+          })
+          this.toggleTimer(this.currentPlayer.piece)
+          this.loading =false
+        }
+      }, 2000);
+
+
   },
   beforeUnmount() {
     window.removeEventListener('resize', this.checkPlatform);
     clearInterval(this.topInterval);
     clearInterval(this.bottomInterval);
   },
+  created(){
+    this.$socket.addEventListener('message', this.handleWebSocketMessage);
+  },
   methods: {
+    async handleWebSocketMessage(event) {
+      this.message = JSON.parse(event.data); // Mettre à jour la donnée du message
+      const data = this.message.data;
+      if(this.message.event === 'upBoard' && data.status==='matching' && parseInt(data.id) === this.party.id){
+        this.board = data.board
+        this.currentPlayer = data.currentPlayer
+        this.topTimerRunning = data.isTopTimer
+        this.bottomTimerRunning = data.isBottomTimer
+        this.selectedPiece = data.selectedPiece
+        this.toggleTimer(data.currentPlayer.piece);
+        await this.checkForCheck();
+      }
+    },
     createBoard() {
       let board = [
         ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'],
@@ -195,13 +271,15 @@ export default {
       const remainingSeconds = seconds % 60;
       const time = `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`
       if (time === '0:00') {
-        console.log("🚀 ~ defaite pour :", this.currentPlayer)
+        console.log("🚀 ~ defaite pour :", this.currentPlayer.name)
       }
       return time;
     },
     toggleTimer(playerColor) {
-      this.currentPlayer === 'white' ? this.topTimerRunning = true : this.topTimerRunning = false;
-      this.currentPlayer === 'black' ? this.bottomTimerRunning = true : this.bottomTimerRunning = false;
+      // console.log("🚀 ~ playerColor:", playerColor, this.currentPlayer.piece )
+
+      this.currentPlayer.piece === 'white' ? this.topTimerRunning = true : this.topTimerRunning = false;
+      this.currentPlayer.piece === 'black' ? this.bottomTimerRunning = true : this.bottomTimerRunning = false;
       if (playerColor) {
         if (this.topTimerRunning) {
           clearInterval(this.topInterval);
@@ -252,19 +330,19 @@ export default {
     },
     async handleCellClick(row, col) {
       const selectedPiece = this.board[row][col];
-      if (this.selectedPiece) {
+      if (this.selectedPiece && this.user.id === this.currentPlayer.id) {
+        console.log("🚀 ~ selectedPiece a jour :",this. selectedPiece)
         if (this.validMoves.some(move => move[0] === row && move[1] === col)) {
           this.movePiece(this.selectedPiece, [row, col]);
-          this.currentPlayer = this.currentPlayer === 'white' ? 'black' : 'white'; // Switch turn
-          console.log("🚀 ~ au tour du : ", this.currentPlayer)
-          await this.checkForCheck();
-          this.toggleTimer(this.currentPlayer)
+          this.currentPlayer = this.currentPlayer.piece === 'white' ? this.player2 : this.player1 // Switch turn
+          await updatePartyboard(this.party.id,this.board,this.party.status, this.currentPlayer, this.topTimerRunning,this.bottomTimerRunning, null)
         }
         this.selectedPiece = null;
         this.validMoves = [];
-      } else if (selectedPiece) {
+      } else if (selectedPiece && this.user.id === this.currentPlayer.id) {
         this.selectedPiece = [row, col];
         this.validMoves = await this.getValidMoves(row, col);
+        console.log("🚀 ~ this.validMoves:", this.validMoves)
       }
     },
     movePiece(from, to) {
@@ -276,6 +354,7 @@ export default {
         from: [fromRow, fromCol],
         to : [toRow, toCol]
       }
+
     },
     // Verification pour pouvoir faire un roque
     isValidKingsideCastling(isWhite) {
@@ -506,6 +585,7 @@ export default {
             if (Math.abs(lastToCol - lastFromCol) !== 1 && this.board[lastToRow][lastToCol].toLowerCase() === 'p') {
               setTimeout(() => {
                 if (this.board[lastFromRow - direction][lastFromCol].toLowerCase() === 'p') {
+                  console.log('en passant')
                   this.board[lastToRow][lastToCol] = ''; // Retirer le pion capturé
                 }
               }, 2500);
@@ -523,7 +603,7 @@ export default {
       const isWhite = piece === piece.toUpperCase();
 
         // Check if it's current player's turn
-      if ((this.currentPlayer === 'white' && !isWhite) || (this.currentPlayer === 'black' && isWhite)) {
+      if ((this.currentPlayer.piece === 'white' && !isWhite) || (this.currentPlayer.piece === 'black' && isWhite)) {
         return this.moves = []; // Return empty moves if it's not the current player's turn
       }
 

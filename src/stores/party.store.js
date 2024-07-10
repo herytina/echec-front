@@ -17,4 +17,5 @@ export const usePartyStore = defineStore('party', {
   getters: {
     yourParty: (state) => state.party,
   },
+  persist: true,
 })
