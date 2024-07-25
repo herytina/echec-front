@@ -45,9 +45,9 @@ export const updateParty = async (id,userId,status) => {
   }
 }
 
-export const updatePartyboard = async (id,board,status,currentPlayer, isTopTimer,isBottomTimer,selectedPiece) => {
+export const updatePartyboard = async (id,board,status,currentPlayer, isTopTimer,isBottomTimer,selectedPiece,lastMove) => {
   try {
-    const response = await apiClient.put(`${URL}/updatedBoard/${id}`, { board, status, currentPlayer, isTopTimer, isBottomTimer, selectedPiece })
+    const response = await apiClient.put(`${URL}/updatedBoard/${id}`, { board, status, currentPlayer, isTopTimer, isBottomTimer, selectedPiece,lastMove })
     return response.data
   } catch (error) {
     console.error('Error fetching update party board', error);

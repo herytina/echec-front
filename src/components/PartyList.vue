@@ -15,7 +15,7 @@
       class="list"
     >
       <v-list-item-title>
-        <span class="text-h6">{{ party.name }} <span class="text-medium-emphasis text-caption">creer par {{ party.players[0].name || JSON }}</span> </span>
+        <span class="text-h6">{{ party.name }} <span class="text-medium-emphasis text-caption">créer par {{ JSON.parse(party.players)[0].name }}</span> </span>
       </v-list-item-title>
 
       <v-list-item-subtitle>
@@ -101,9 +101,8 @@ export default {
     },
     playParty(id) {
       let user = this.user
-      // user.piece = "black"
       getPartybyId(id).then(async (party) => {
-        let player1 = party.players[0]
+        let player1 = JSON.parse(party.players)[0]
         if(!this.isEqual(player1, user) && party.mise < user.solde){
           this.isPlayer =false
           let players = [player1]

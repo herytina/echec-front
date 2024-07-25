@@ -164,7 +164,6 @@ export default {
       this.mise++
     },
     postNewParty() {
-      // user.piece = "white"
       createParty(this.partyName, this.mise,JSON.stringify([this.user]), 'created').then((data) => {
         if (data) {
           this.dialog = false;

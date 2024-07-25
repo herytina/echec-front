@@ -1,9 +1,8 @@
 <template>
   <div id="PartyChess">
-    <NavBarVue bgColor="party"/>
-    <ChessBoard/>
+    <NavBarVue bg-color="party" />
+    <ChessBoard />
   </div>
-
 </template>
 
 <script>

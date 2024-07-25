@@ -3,7 +3,7 @@
     <div>
       <Players
         :avatar-url="profilPlayer1"
-        :player-name="name = player1.piece ==='black' ? player1.name : player2.name"
+        :player-name="name = player1.piece ==='black' ? player1?.name : player2?.name"
         :turn="currentPlayer.piece === 'black'"
       />
     </div>
@@ -64,7 +64,7 @@
     <div>
       <Players
         :avatar-url="profilPlayer1"
-        :player-name="name = player1.piece ==='white' ? player1.name : player2.name"
+        :player-name="name = player1.piece ==='white' ? player1?.name : player2?.name"
         :turn="currentPlayer.piece === 'white'"
       />
     </div>
@@ -123,7 +123,6 @@
       <v-list
         class="py-2"
         color="primary"
-        elevation="12"
         rounded="lg"
       >
         <v-list-item
@@ -156,9 +155,10 @@
 <script>
 import { useStoreUser } from '@/stores/user.store';
 import { getBishopMoves, getKingMoves, getKingRookMoves, getKnightMoves, getPawnsMoves, getRookMoves } from '@/utils/movesApi';
-import { getPartybyId, updatePartyboard } from '@/utils/partyApi';
+import { updatePartyboard } from '@/utils/partyApi';
 import DialogChessMate from './DialogChessMate.vue';
 import Players from './Players.vue';
+import { usePartyStore } from '@/stores/party.store';
 
 export default {
   components: {
@@ -167,15 +167,17 @@ export default {
   },
   setup() {
     const userStore = useStoreUser();
+    const partyStore = usePartyStore();
     return {
       user: userStore.user,
+      party : partyStore.party
     };
   },
   data() {
     return {
       board: this.createBoard(),
       selectedPiece: null,
-      validMoves: [],
+      validMoves: null,
       currentPlayer: {piece:"white"},
       kingMoved: { white: false, black: false },
       rookMoved: {
@@ -193,7 +195,6 @@ export default {
       audioWchess: require('@/assets/audio/chessKingHomme1.mp3'),
       audioBchess: require('@/assets/audio/chessKingFemme1.mp3'),
       profilPlayer1: require('@/assets/logo.png'),
-      moves: [],
       dialogPromated: false,
       promate : [],
       rowPromoted: 0,
@@ -202,7 +203,6 @@ export default {
       lastMove : null,
       player1:{piece : 'white'},
       player2:{piece : 'black'},
-      party:{},
       loading:true
     };
   },
@@ -212,24 +212,21 @@ export default {
     }
   },
   async mounted() {
-      const id = this.$route.query.id;
-      window.addEventListener('resize', this.checkPlatform);
-      this.party = await getPartybyId(id)
-      setTimeout(() => {
-        if(this.party) {
-          this.player1 =  this.party.players[0]
-          this.player2 =  this.party.players[1]
-          this.party.players.forEach( player =>{
-            if(player.id === this.user.id && player.piece === 'white'){
-              this.currentPlayer = player
-            }
-          })
-          this.toggleTimer(this.currentPlayer.piece)
-          this.loading =false
-        }
-      }, 2000);
-
-
+    window.addEventListener('resize', this.checkPlatform);
+    setTimeout(() => {
+      if(this.party) {
+        this.allPlayers = JSON.parse(this.party.players)
+        this.player1 =  this.allPlayers[0]
+        this.player2 =  this.allPlayers[1]
+        this.allPlayers.forEach( player =>{
+          if(player.id === this.user.id && player.piece === 'white'){
+            this.currentPlayer = player
+          }
+        })
+        this.toggleTimer(this.currentPlayer.piece)
+        this.loading =false
+      }
+    }, 2000);
   },
   beforeUnmount() {
     window.removeEventListener('resize', this.checkPlatform);
@@ -248,7 +245,9 @@ export default {
         this.currentPlayer = data.currentPlayer
         this.topTimerRunning = data.isTopTimer
         this.bottomTimerRunning = data.isBottomTimer
+        this.lastMove = data.lastMove
         this.selectedPiece = data.selectedPiece
+        this.validMoves = data.selectedPiece
         this.toggleTimer(data.currentPlayer.piece);
         await this.checkForCheck();
       }
@@ -330,21 +329,61 @@ export default {
     },
     async handleCellClick(row, col) {
       const selectedPiece = this.board[row][col];
-      if (this.selectedPiece && this.user.id === this.currentPlayer.id) {
-        console.log("🚀 ~ selectedPiece a jour :",this. selectedPiece)
-        if (this.validMoves.some(move => move[0] === row && move[1] === col)) {
-          this.movePiece(this.selectedPiece, [row, col]);
-          this.currentPlayer = this.currentPlayer.piece === 'white' ? this.player2 : this.player1 // Switch turn
-          await updatePartyboard(this.party.id,this.board,this.party.status, this.currentPlayer, this.topTimerRunning,this.bottomTimerRunning, null)
-        }
-        this.selectedPiece = null;
-        this.validMoves = [];
-      } else if (selectedPiece && this.user.id === this.currentPlayer.id) {
-        this.selectedPiece = [row, col];
-        this.validMoves = await this.getValidMoves(row, col);
-        console.log("🚀 ~ this.validMoves:", this.validMoves)
+
+      if (!this.isCurrentUserTurn()) return;
+
+      if (this.isValidMove(row, col)) {
+        await this.processMove(row, col);
+        return;
+      }
+
+      if (this.isSelectablePiece(selectedPiece)) {
+        await this.selectPieceAndFetchMoves(row, col, selectedPiece);
       }
     },
+
+    isCurrentUserTurn() {
+      return this.user.id === this.currentPlayer.id;
+    },
+
+    isValidMove(row, col) {
+      return this.selectedPiece && this.validMoves && this.validMoves.some(move => move[0] === row && move[1] === col);
+    },
+
+    async processMove(row, col) {
+      this.movePiece(this.selectedPiece, [row, col]);
+      this.switchTurn();
+      await this.updateGameBoard();
+    },
+
+    switchTurn() {
+      this.currentPlayer = this.currentPlayer.id === this.player1.id ? this.player2 : this.player1;
+    },
+
+    async updateGameBoard() {
+      try {
+        await updatePartyboard(this.party.id, this.board, this.party.status, this.currentPlayer, this.topTimerRunning, this.bottomTimerRunning, null, this.lastMove);
+      } catch (error) {
+        console.error('Error updating game board:', error);
+      }
+    },
+
+    isSelectablePiece(selectedPiece) {
+      const isWhite = selectedPiece === selectedPiece.toUpperCase();
+      return selectedPiece && ((this.currentPlayer.piece === 'white' && isWhite) || (this.currentPlayer.piece === 'black' && !isWhite));
+    },
+
+    async selectPieceAndFetchMoves(row, col, selectedPiece) {
+      this.selectedPiece = [row, col];
+      try {
+        console.log('Before calling getValidMoves');
+        this.validMoves = await this.getValidMoves(row, col, selectedPiece);
+        console.log('Valid moves:', this.validMoves);
+      } catch (error) {
+        console.error('Error in getValidMoves:', error);
+      }
+    },
+
     movePiece(from, to) {
       const [fromRow, fromCol] = from;
       const [toRow, toCol] = to;
@@ -398,7 +437,7 @@ export default {
         if (await this.isCheckmate('white')) {
           this.showDialog = true
         } else {
-          whiteCheckAudio.play();
+          this.user.sexe === 'homme' && this.currentPlayer.piece === 'white' ? whiteCheckAudio.play() : blackCheckAudio.play();
         }
         return true;
       }
@@ -406,7 +445,7 @@ export default {
         if (await this.isCheckmate('black')) {
           this.showDialog = true
         } else {
-          blackCheckAudio.play();
+          this.user.sexe === 'homme' && this.currentPlayer.piece === 'black' ? whiteCheckAudio.play() : blackCheckAudio.play();
         }
         return true;
       }
@@ -545,7 +584,7 @@ export default {
         for (let x = 0; x < this.board[y].length; x++) {
           const piece = this.board[y][x];
           if (piece !== '' && this.isOpponentPieces(piece, color)) {
-            const pieceMoves = await this.getValidMoves(y, x);
+            const pieceMoves = await this.getValidMoves(y, x, piece);
             for (const move of pieceMoves) {
               moves.push({ from: { x, y }, to: { y: move[0], x: move[1] } });
             }
@@ -583,70 +622,80 @@ export default {
           if (lastToRow === row && Math.abs(lastToCol - col) === 1) {
             // Capture en passant
             if (Math.abs(lastToCol - lastFromCol) !== 1 && this.board[lastToRow][lastToCol].toLowerCase() === 'p') {
-              setTimeout(() => {
-                if (this.board[lastFromRow - direction][lastFromCol].toLowerCase() === 'p') {
-                  console.log('en passant')
+              setTimeout(async ()=>{
+                if(this.board[lastFromRow - direction][lastFromCol].toLowerCase() === ''){
                   this.board[lastToRow][lastToCol] = ''; // Retirer le pion capturé
+                  await updatePartyboard(this.party.id,this.board,this.party.status, this.currentPlayer, this.topTimerRunning,this.bottomTimerRunning, null, this.lastMove)
                 }
-              }, 2500);
+              }, 1000)
             }
-            this.moves.push([row + direction, lastToCol]);
           }
         }
       }
     },
-    async getValidMoves(row, col) {
-      const piece = this.board[row][col];
+    async getValidMoves(row, col, piece) {
 
-      if (!piece) return this.moves;
+      let moves = [];
 
       const isWhite = piece === piece.toUpperCase();
 
-        // Check if it's current player's turn
-      if ((this.currentPlayer.piece === 'white' && !isWhite) || (this.currentPlayer.piece === 'black' && isWhite)) {
-        return this.moves = []; // Return empty moves if it's not the current player's turn
-      }
-
-      if (piece.toLowerCase() === 'p') {
-        this.moves = await getPawnsMoves(row, col, isWhite, this.board, this.lastMove);
-        this.checkAndPromotePawn();
-        this.enPassant(row, col,isWhite)
-      } else if (piece.toLowerCase() === 'r') {
-        this.moves = await getRookMoves(row, col, isWhite, this.board);
-      } else if (piece.toLowerCase() === 'n') {
-        this.moves = await getKnightMoves(row, col, isWhite, this.board)
-      } else if (piece.toLowerCase() === 'b') {
-        this.moves = await getBishopMoves(row, col, isWhite, this.board);
-      } else if (piece.toLowerCase() === 'q') {
-        this.moves = await this.getQueenMoves(row, col, isWhite, this.board);
-      } else if (piece.toLowerCase() === 'k') {
-                  console.log("🚀 ~ this.kingAlreadyMoves:", this.kingAlreadyMoves)
-
-        if (this.isValidKingsideCastling(isWhite) && !this.kingAlreadyMoves) {
-          this.moves = await getKingRookMoves(row, col, 1,this.kingMoved, isWhite, this.board);
-          setTimeout(() => {
-            if (this.board[row][6].toLowerCase() === 'k') {
-              this.getTRookMoves(row)
-            }
-          }, 2500);
-        } else if (this.isValidQueensideCastling(isWhite) && !this.kingAlreadyMoves) {
-          this.moves = await getKingRookMoves(row, col, -1,this.kingMoved, isWhite, this.board);
-          setTimeout(() => {
-            if (this.board[row][2].toLowerCase() === 'k') {
-              this.getTRookMoves(row)
-            }
-           }, 2500);
-
-        } else {
-          this.moves = await getKingMoves(row, col, isWhite, this.board);
-          this.kingAlreadyMoves = true
+      try {
+        if (piece.toLowerCase() === 'p') {
+          moves = await getPawnsMoves(row, col, isWhite, this.board, this.lastMove);
+          try {
+            this.enPassant(row, col, isWhite);
+          } catch (error) {
+            console.error('Error in enPassant:', error);
+          }
+          try {
+            this.checkAndPromotePawn();
+          } catch (error) {
+            console.error('Error in checkAndPromotePawn:', error);
+          }
+        } else if (piece.toLowerCase() === 'r') {
+          moves = await getRookMoves(row, col, isWhite, this.board);
+        } else if (piece.toLowerCase() === 'n') {
+          moves = await getKnightMoves(row, col, isWhite, this.board);
+        } else if (piece.toLowerCase() === 'b') {
+          moves = await getBishopMoves(row, col, isWhite, this.board);
+        } else if (piece.toLowerCase() === 'q') {
+          moves = await this.getQueenMoves(row, col, isWhite, this.board);
+        } else if (piece.toLowerCase() === 'k') {
+          if (this.isValidKingsideCastling(isWhite) && !this.kingAlreadyMoves) {
+            moves = await getKingRookMoves(row, col, 1, this.kingMoved, isWhite, this.board);
+            setTimeout(async () => {
+              try {
+                if (this.board[row][6].toLowerCase() === 'k') {
+                  await this.getTRookMoves(row);
+                }
+              } catch (error) {
+                console.error('Error in getTRookMoves (kingside castling):', error);
+              }
+            }, 2500);
+          } else if (this.isValidQueensideCastling(isWhite) && !this.kingAlreadyMoves) {
+            moves = await getKingRookMoves(row, col, -1, this.kingMoved, isWhite, this.board);
+            setTimeout(async () => {
+              try {
+                if (this.board[row][2].toLowerCase() === 'k') {
+                  await this.getTRookMoves(row);
+                }
+              } catch (error) {
+                console.error('Error in getTRookMoves (queenside castling):', error);
+              }
+            }, 2500);
+          } else {
+            moves = await getKingMoves(row, col, isWhite, this.board);
+            this.kingAlreadyMoves = true;
+          }
         }
+      } catch (error) {
+        console.error('Error in getValidMoves processing:', error);
       }
-
-      return this.moves;
+      return moves;
     },
+
     // Deplacement des pieces...
-    getTRookMoves(row) {
+    async getTRookMoves(row) {
       if (this.rookMoved.white.left && row === 0) {
         if (this.board[row][7] === 'R') {
           this.board[row][5] = 'R'
@@ -668,9 +717,11 @@ export default {
           this.board[row][3] = 'r'
         }
       }
+      await updatePartyboard(this.party.id,this.board,this.party.status, this.currentPlayer, this.topTimerRunning,this.bottomTimerRunning, null, this.lastMove)
     },
-    promotePawn(x, y, newPiece) {
-        this.board[x][y] = newPiece;
+    async promotePawn(x, y, newPiece) {
+      this.board[x][y] = newPiece;
+      await updatePartyboard(this.party.id,this.board,this.party.status, this.currentPlayer, this.topTimerRunning,this.bottomTimerRunning, null, this.lastMove)
     },
     // Méthode pour vérifier et gérer la promotion d'un pion noir
     checkAndPromotePawn() {
@@ -725,6 +776,9 @@ export default {
   width: 95%;
   height: 95%;
   margin-top: 20px;
+}
+.reverse{
+  flex-direction: column-reverse;
 }
 .row {
   display: flex;

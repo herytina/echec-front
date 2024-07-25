@@ -54,12 +54,12 @@
     </div>
     <v-card
       title="Joueurs"
-      :text="party.players[0].name"
+      :text="JSON.parse(party.players)[0].name"
     />
 
     <v-card
-      v-if="party.players[1]"
-      :text="party.players[1].name"
+      v-if="JSON.parse(party.players)[1]"
+      :text="JSON.parse(party.players)[1].name"
     />
 
     <v-progress-circular
@@ -74,10 +74,10 @@
 </template>
 
 <script>
-import { usePartyStore } from '@/stores/party.store';
 import { useStoreUser } from '@/stores/user.store';
 import { getPartybyId, updateParty } from '@/utils/partyApi';
 import NavBarVue from '../components/NavBar.vue';
+import { usePartyStore } from '@/stores/party.store';
 
 export default{
   name:"WaitPlayer",
@@ -86,8 +86,9 @@ export default{
   },
   setup() {
     const userStore = useStoreUser();
+
     return {
-      user: userStore.user,
+      user: userStore.user
     };
   },
   data(){
@@ -120,33 +121,34 @@ export default{
     this.$socket.addEventListener('message', this.handleWebSocketMessage);
   },
   async mounted() {
-    const partyStore = usePartyStore();
     try {
       const id = this.$route.query.id;
       if(id !== null){
         this.party = await getPartybyId(id);
-        this.party.players.length === 2 ? this.isFullPlayer = true : this.isFullPlayer =false;
-        partyStore.setParty(this.party)
+        JSON.parse(this.party.players).length === 2 ? this.isFullPlayer = true : this.isFullPlayer = false;
       }
     } catch (error) {
       console.error('fetch party failed', error);
     }
   },
   methods:{
-    handleWebSocketMessage(event) {
+    async handleWebSocketMessage(event) {
+      const partyStore = usePartyStore()
       this.message = JSON.parse(event.data); // Mettre à jour la donnée du message
       if(this.message.event === 'playIn'){
         this.party = this.message.data[0];
-        this.party.players.length === 2 ? this.isFullPlayer = true : this.isFullPlayer =false;
+        JSON.parse(this.party.players).length === 2 ? this.isFullPlayer = true : this.isFullPlayer = false;
       }else if(this.message.event === 'letsPlay' && this.message.data.status === 'matching' && parseInt(this.message.data.id) === this.party.id){
-        this.$router.push({name:'PartyChess', query:{id:this.party.id}})
+        const party = await getPartybyId(this.party.id);
+        partyStore.setParty(party);
+        this.$router.push('/party')
       }
     },
     async choiseColor(color){
-      if(this.party.players.length === 2){
+      if(JSON.parse(this.party.players).length === 2){
         let player1
         let player2
-        this.party.players.forEach(player => {
+        JSON.parse(this.party.players).forEach(player => {
           if(color === 'white'){
             if(player.id === this.user.id){
                 player.piece = color
@@ -166,7 +168,7 @@ export default{
             }
           }
         });
-         const players = [player1,player2]
+        const players = [player1,player2]
         await updateParty(this.party.id, JSON.stringify(players),'matching');
         this.selectedPiece = true
       }

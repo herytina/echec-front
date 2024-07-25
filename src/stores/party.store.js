@@ -6,7 +6,10 @@ export const usePartyStore = defineStore('party', {
       id: null,
       name: '',
       players: '',
-      mise: ''
+      mise: '',
+      status: '',
+      createdAt: '',
+      updatedAt: ''
     },
   }),
   actions: {

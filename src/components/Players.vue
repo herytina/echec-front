@@ -1,18 +1,29 @@
 <template>
   <div class="player">
-    <v-avatar size="54" class="mx-auto">
-      <img :src="avatarUrl" alt="Avatar">
+    <v-avatar
+      size="54"
+      class="mx-auto"
+    >
+      <img
+        :src="avatarUrl"
+        alt="Avatar"
+      >
     </v-avatar>
     <div class="player-info">
-      <div class="player-name">{{ playerName }}</div>
-      <div v-if="turn" class="status-indicator"></div>
+      <div class="player-name">
+        {{ playerName }}
+      </div>
+      <div
+        v-if="turn"
+        class="status-indicator"
+      />
     </div>
   </div>
 </template>
 
 <script>
 export default {
-  name: 'Player-chess',
+  name: 'PlayerChess',
   props: {
     avatarUrl: {
       type: String,
