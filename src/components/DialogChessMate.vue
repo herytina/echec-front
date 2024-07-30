@@ -36,12 +36,20 @@
           <v-text-field
             v-model="partyName"
             label="Nom de la partie"
+            variant="solo"
             required
           />
 
           <div>
             <span class="text-subheading">MISE :</span>
           </div>
+
+          <v-text-field
+            v-model="mise"
+            append-inner-icon="mdi-currency-usd"
+            variant="solo"
+            required
+          />
 
           <v-slider
             v-model="mise"
@@ -82,19 +90,22 @@
         </v-card-text>
 
 
-        <v-card-actions>
-          <v-spacer />
+        <v-card-actions class="d-flex mb-6">
           <v-btn
+            class="ma-2 pa-2 me-auto"
             color="warning"
             text="annuler"
             variant="outlined"
+            append-icon="mdi-cancel"
             @click="dialog = false"
           />
-
           <v-btn
+            class="w-33"
             color="success"
-            text="envoyer"
+            text="créer"
             variant="flat"
+            append-icon="mdi-pencil-outline"
+            end
             @click="postNewParty"
           />
         </v-card-actions>

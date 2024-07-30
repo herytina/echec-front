@@ -46,6 +46,9 @@
             v-for="(item, i) in items"
             :key="i"
           >
+            <template #prepend>
+              <v-icon :icon="item.icon" />
+            </template>
             <v-list-item-title @click="item.access">
               {{ item.title }}
             </v-list-item-title>
@@ -77,14 +80,23 @@ export default {
       iconMoney: require('@/assets/logo/money.svg'),
       avatar: null,
       items: [
-        { title: 'Compte', access : this.compte },
-        { title: 'Parametre', access : this.parameter  },
-        { title: 'Deconnexion', access : this.logout },
+        { title: 'Compte', access : this.compte, icon:'mdi-account' },
+        { title: 'Parametre', access : this.parameter, icon:'mdi-cog-outline'  },
+        { title: 'Transaction', access : this.parameter, icon:'mdi-cash-multiple'  },
+        { title: 'Deconnexion', access : this.logout, icon:'mdi-logout' },
       ]
       }
   },
+  computed(){
+    if(this.user === null){
+      console.log('ici c user ', this.user);
+      this.logout();
+    }
+  },
   methods: {
     logout() {
+      const userStore = useStoreUser()
+      userStore.setUser({})
       this.$router.push('/')
     },
     parameter() {

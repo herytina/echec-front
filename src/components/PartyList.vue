@@ -47,6 +47,7 @@
 <script>
 import { useStoreUser } from '@/stores/user.store';
 import { getAllParty, getPartybyId, updateParty } from '@/utils/partyApi';
+import socket from '@/services/socket';
 
 export default {
   props: {
@@ -68,19 +69,6 @@ export default {
       isPlayer : false
     }
   },
-  sockets: {
-    connect() {
-      console.log('WebSocket connected');
-    },
-    disconnect() {
-      console.log('WebSocket disconnected');
-    },
-    message(data) {
-      if (data.event === 'newParty') {
-        this.partyLists.push(data.data);
-      }
-    },
-  },
   watch: {
     newParty(val) {
       this.partyLists = val;
@@ -90,15 +78,11 @@ export default {
     await this.fetchAllParty()
   },
   created(){
-    this.$socket.addEventListener('message', this.handleWebSocketMessage);
+    socket.onNewParty((response) => {
+      this.partyLists = response.data;
+    });
   },
   methods:{
-    handleWebSocketMessage(event) {
-      this.message = JSON.parse(event.data); // Mettre à jour la donnée du message
-      if(this.message.event === 'newParty' ){
-        this.partyLists = this.message.data
-      }
-    },
     playParty(id) {
       let user = this.user
       getPartybyId(id).then(async (party) => {

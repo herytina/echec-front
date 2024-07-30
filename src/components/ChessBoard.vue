@@ -155,10 +155,10 @@
 <script>
 import { useStoreUser } from '@/stores/user.store';
 import { getBishopMoves, getKingMoves, getKingRookMoves, getKnightMoves, getPawnsMoves, getRookMoves } from '@/utils/movesApi';
-import { updatePartyboard } from '@/utils/partyApi';
 import DialogChessMate from './DialogChessMate.vue';
 import Players from './Players.vue';
 import { usePartyStore } from '@/stores/party.store';
+import socket from '@/services/socket';
 
 export default {
   components: {
@@ -234,24 +234,19 @@ export default {
     clearInterval(this.bottomInterval);
   },
   created(){
-    this.$socket.addEventListener('message', this.handleWebSocketMessage);
+    socket.onGameBoardUpdated(async (data) => {
+      console.log('Game board updated:', data);
+      this.currentPlayer = data.currentPlayer
+      this.board = data.board
+      this.topTimerRunning = data.topTimerRunning
+      this.bottomTimerRunning = data.bottomTimerRunning
+      this.lastMove = data.lastMove
+      this.toggleTimer(this.currentPlayer.piece);
+      await this.checkForCheck()
+      // Vous pouvez ajouter des actions à effectuer après la réception d'une mise à jour du tableau de jeu
+    });
   },
   methods: {
-    async handleWebSocketMessage(event) {
-      this.message = JSON.parse(event.data); // Mettre à jour la donnée du message
-      const data = this.message.data;
-      if(this.message.event === 'upBoard' && data.status==='matching' && parseInt(data.id) === this.party.id){
-        this.board = data.board
-        this.currentPlayer = data.currentPlayer
-        this.topTimerRunning = data.isTopTimer
-        this.bottomTimerRunning = data.isBottomTimer
-        this.lastMove = data.lastMove
-        this.selectedPiece = data.selectedPiece
-        this.validMoves = data.selectedPiece
-        this.toggleTimer(data.currentPlayer.piece);
-        await this.checkForCheck();
-      }
-    },
     createBoard() {
       let board = [
         ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R'],
@@ -275,8 +270,6 @@ export default {
       return time;
     },
     toggleTimer(playerColor) {
-      // console.log("🚀 ~ playerColor:", playerColor, this.currentPlayer.piece )
-
       this.currentPlayer.piece === 'white' ? this.topTimerRunning = true : this.topTimerRunning = false;
       this.currentPlayer.piece === 'black' ? this.bottomTimerRunning = true : this.bottomTimerRunning = false;
       if (playerColor) {
@@ -291,7 +284,6 @@ export default {
             }
           }, 1000);
         }
-        // this.topTimerRunning = !this.topTimerRunning;
 
         if (this.bottomTimerRunning) {
           clearInterval(this.bottomInterval);
@@ -304,7 +296,6 @@ export default {
             }
           }, 1000);
         }
-        // this.bottomTimerRunning = !this.bottomTimerRunning;
       }
     },
     getCellColor(row, col) {
@@ -333,7 +324,7 @@ export default {
       if (!this.isCurrentUserTurn()) return;
 
       if (this.isValidMove(row, col)) {
-        await this.processMove(row, col);
+        this.processMove(row, col);
         return;
       }
 
@@ -350,19 +341,28 @@ export default {
       return this.selectedPiece && this.validMoves && this.validMoves.some(move => move[0] === row && move[1] === col);
     },
 
-    async processMove(row, col) {
+    processMove(row, col) {
       this.movePiece(this.selectedPiece, [row, col]);
       this.switchTurn();
-      await this.updateGameBoard();
+      this.updateGameBoard();
     },
 
     switchTurn() {
       this.currentPlayer = this.currentPlayer.id === this.player1.id ? this.player2 : this.player1;
+      this.currentPlayer = this.currentPlayer.piece === 'white' ? this.player2 : this.player1
     },
 
-    async updateGameBoard() {
+    updateGameBoard() {
       try {
-        await updatePartyboard(this.party.id, this.board, this.party.status, this.currentPlayer, this.topTimerRunning, this.bottomTimerRunning, null, this.lastMove);
+        socket.updateGameBoard(
+          this.party.id,
+          this.board,
+          this.party.status,
+          this.currentPlayer,
+          this.topTimerRunning,
+          this.bottomTimerRunning,
+          this.lastMove
+        );
       } catch (error) {
         console.error('Error updating game board:', error);
       }
@@ -376,9 +376,7 @@ export default {
     async selectPieceAndFetchMoves(row, col, selectedPiece) {
       this.selectedPiece = [row, col];
       try {
-        console.log('Before calling getValidMoves');
         this.validMoves = await this.getValidMoves(row, col, selectedPiece);
-        console.log('Valid moves:', this.validMoves);
       } catch (error) {
         console.error('Error in getValidMoves:', error);
       }
@@ -437,7 +435,7 @@ export default {
         if (await this.isCheckmate('white')) {
           this.showDialog = true
         } else {
-          this.user.sexe === 'homme' && this.currentPlayer.piece === 'white' ? whiteCheckAudio.play() : blackCheckAudio.play();
+          this.user.sexe === 'homme' && this.currentPlayer.piece === 'black' ? whiteCheckAudio.play() : blackCheckAudio.play();
         }
         return true;
       }
@@ -445,7 +443,7 @@ export default {
         if (await this.isCheckmate('black')) {
           this.showDialog = true
         } else {
-          this.user.sexe === 'homme' && this.currentPlayer.piece === 'black' ? whiteCheckAudio.play() : blackCheckAudio.play();
+          this.user.sexe === 'homme' && this.currentPlayer.piece === 'white' ? whiteCheckAudio.play() : blackCheckAudio.play();
         }
         return true;
       }
@@ -622,11 +620,10 @@ export default {
           if (lastToRow === row && Math.abs(lastToCol - col) === 1) {
             // Capture en passant
             if (Math.abs(lastToCol - lastFromCol) !== 1 && this.board[lastToRow][lastToCol].toLowerCase() === 'p') {
-              setTimeout(async ()=>{
+              setTimeout(()=>{
                 if(this.board[lastFromRow - direction][lastFromCol].toLowerCase() === ''){
                   this.board[lastToRow][lastToCol] = ''; // Retirer le pion capturé
-                  await updatePartyboard(this.party.id,this.board,this.party.status, this.currentPlayer, this.topTimerRunning,this.bottomTimerRunning, null, this.lastMove)
-                }
+                  this.updateGameBoard();                }
               }, 1000)
             }
           }
@@ -695,7 +692,7 @@ export default {
     },
 
     // Deplacement des pieces...
-    async getTRookMoves(row) {
+    getTRookMoves(row) {
       if (this.rookMoved.white.left && row === 0) {
         if (this.board[row][7] === 'R') {
           this.board[row][5] = 'R'
@@ -717,11 +714,11 @@ export default {
           this.board[row][3] = 'r'
         }
       }
-      await updatePartyboard(this.party.id,this.board,this.party.status, this.currentPlayer, this.topTimerRunning,this.bottomTimerRunning, null, this.lastMove)
+      this.updateGameBoard();    
     },
-    async promotePawn(x, y, newPiece) {
+    promotePawn(x, y, newPiece) {
       this.board[x][y] = newPiece;
-      await updatePartyboard(this.party.id,this.board,this.party.status, this.currentPlayer, this.topTimerRunning,this.bottomTimerRunning, null, this.lastMove)
+      this.updateGameBoard();
     },
     // Méthode pour vérifier et gérer la promotion d'un pion noir
     checkAndPromotePawn() {
