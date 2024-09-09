@@ -4,10 +4,12 @@
       size="54"
       class="mx-auto"
     >
-      <img
-        :src="avatarUrl"
-        alt="Avatar"
-      >
+      <NameToAvatar
+        :name="playerName"
+        size="54"
+        :background-color="solde < 60000 ? '#ffc400' : '#09ff00'"
+        text-color="#ffffff"
+      />
     </v-avatar>
     <div class="player-info">
       <div class="player-name">
@@ -22,11 +24,17 @@
 </template>
 
 <script>
+import NameToAvatar from '@/components/NameToAvatar.vue';
+import { useStoreUser } from '@/stores/user.store';
+
 export default {
   name: 'PlayerChess',
+  components :{
+    NameToAvatar
+  },
   props: {
-    avatarUrl: {
-      type: String,
+    solde: {
+      type: Number,
       required: true
     },
     playerName: {
@@ -37,7 +45,13 @@ export default {
       type: Boolean,
       required: true
     }
-  }
+  },
+  setup() {
+    const userStore = useStoreUser();
+    return {
+      user: userStore.user,
+    };
+  },
 }
 </script>
 

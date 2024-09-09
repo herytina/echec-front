@@ -1,6 +1,7 @@
 <template>
   <div v-if="party">
     <NavBarVue bg-color="global" />
+    
     <div class="mt-7">
       <v-sheet
         class="pa-4 text-center mx-auto"
@@ -61,6 +62,10 @@
       <v-card-title prepend-icon="mdi-handshake-outline">
         Les joueurs
       </v-card-title>
+      <v-divider
+        :thickness="2"
+        class="border-opacity-25"
+      />
       <v-row class="mx-auto mt-7">
         <v-col>
           <NameToAvatar
@@ -100,7 +105,7 @@
         <v-col>
           <div v-if="!JSON.parse(party.players)[1]">
             <v-icon size="65">
-              mdi-account-settings
+              mdi-account-search-outline
             </v-icon>
           </div>
           <div v-if="JSON.parse(party.players)[1]">
@@ -126,7 +131,8 @@
 
     <v-snackbar
       v-model="snackbar"
-      color="success"
+      color="warning"
+      class="pa-16"
     >
       {{ JSON.parse(party.players)[0].piece === 'white' && JSON.parse(party.players)[0].id === user.id || 
         JSON.parse(party.players)[1].piece === 'white' && JSON.parse(party.players)[1].id === user.id ? 'Vous êtes blanc' : 'Vous êtes Noire' }}
@@ -140,6 +146,20 @@
       </template>
     </v-snackbar>
 
+    <v-snackbar
+      v-model="playersWithStatus.length"
+      color="warning"
+      class="pa-16"
+    >
+      <div
+        v-for="player in playersWithStatus"
+        :key="player.name"
+      >
+        {{ player.name }} est prêt.
+      </div>
+    </v-snackbar>
+    
+    
     <div
       v-if="selectedPiece"
       class="position-absolute bottom-0 right-0 pa-5"
@@ -147,11 +167,26 @@
       <v-btn
         color="warning"
         variant="flat"
+        :disabled="onReady"
         @click="goToboard"
       >
         prêts
       </v-btn>
     </div>
+    <v-dialog
+      v-model="onReady"
+      width="auto"
+      class="transparent-dialog"
+      persistent
+    >
+      <v-card
+        max-width="400"
+      >
+        <v-card-text class="mx-auto text-h1">
+          {{ label }}
+        </v-card-text>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -162,6 +197,7 @@ import NavBarVue from '../components/NavBar.vue';
 import { usePartyStore } from '@/stores/party.store';
 import socket from '@/services/socket';
 import NameToAvatar from '@/components/NameToAvatar.vue';
+import { usePlayerStore } from '@/stores/players.store';
 
 export default{
   name:"WaitPlayer",
@@ -171,9 +207,8 @@ export default{
   },
   setup() {
     const userStore = useStoreUser();
-
     return {
-      user: userStore.user
+      user: userStore.user,
     };
   },
   data(){
@@ -186,7 +221,18 @@ export default{
         {color:'black',image:require('@/assets/chess-p/black-king.svg')}
       ],
       selectedPiece : false,
-      vs : require('@/assets/logo/vs.png')
+      vs : require('@/assets/logo/vs.png'),
+      players:[],
+      allReadyPlayer:false,
+      onReady: false,
+      label : 0,
+      intervalId: null,
+      playersWithStatus : []
+    }
+  },
+  computed: {
+    allStatusReady() {
+      return this.party.every(item => item.status && item.status === 'ready');
     }
   },
   created(){
@@ -200,9 +246,18 @@ export default{
       partyStore.setParty(this.party);
       this.selectedPiece = true;
       this.snackbar=true
-      // if(response.data.status === 'matching'){
-      //   // this.$router.push('/party')
-      // }
+    })
+    socket.onReadyPlayer(async (response)=>{
+      const playerStore = usePlayerStore()
+      const playersSocket = response.players;
+      playerStore.setPlayers(playersSocket)
+      this.players = playerStore.players
+      this.allReadyPlayer = this.players.every(item => 'status' in item);
+      this.playersWithStatus = this.players.filter(item => 'status' in item);
+      if(this.allReadyPlayer){
+        this.onReady = false
+        this.$router.push('/party')
+      }
     })
   },
   async mounted() {
@@ -216,7 +271,23 @@ export default{
       console.error('fetch party failed', error);
     }
   },
+  beforeUnmount() {
+    // Nettoyer l'intervalle lors de la destruction du composant
+    clearInterval(this.intervalId);
+  },
   methods:{
+    async updateStatus() {
+      // Simuler une mise à jour du tableau de jeu avec un délai
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          this.allReadyPlayer = this.players.every(item => 'status' in item);
+          if(this.allReadyPlayer){
+            this.$router.push('/party')
+          }
+          resolve();
+        }, 1000);
+      });
+    },
     async choiseColor(color){
       if(JSON.parse(this.party.players).length === 2){
         let player1
@@ -246,14 +317,49 @@ export default{
       }
 
     },
-    goToboard(){
-      console.log('lasa ty anh');
+    async goToboard(){
+      const playerStore = usePlayerStore() 
+      let tmpPlayer = this.players.length === 0 ? JSON.parse(this.party.players) : this.players
+      let tmpPlayer1 = tmpPlayer[0]
+      let tmpPlayer2 = tmpPlayer[1]
+      if(this.user.id === tmpPlayer1.id){
+        tmpPlayer1.status = 'ready'
+      }else if(this.user.id === tmpPlayer2.id){
+        tmpPlayer2.status = 'ready'
+      }
+      this.players = [tmpPlayer1, tmpPlayer2]
+      playerStore.setPlayers(this.players);
+      this.players = playerStore.players
+      console.log(this.players)
+      this.onReady = true
+      if (this.onReady) {
+        // Démarrer l'incrémentation du label chaque seconde
+        this.intervalId = setInterval(() => {
+          this.label += 1;
+          if (this.label >= 30) {
+            this.onReady = false;
+            clearInterval(this.intervalId);
+            this.label = 0; // Réinitialiser le label
+          }
+        }, 1000);
+      } else {
+        // Arrêter l'incrémentation du label et réinitialiser la valeur
+        clearInterval(this.intervalId);
+        this.label = 0;
+      }
+      try{
+        await this.updateStatus()
+        socket.readyToPlay(this.players)
+      }catch(error){
+        console.error('error to up players', error)
+      }
     }
   }
 }
 </script>
 
 <style scoped>
+
 .progress{
   display: flex;
   justify-content: center;
@@ -279,5 +385,11 @@ export default{
 .promotion-image {
   width: 50px;
   height: 50px;
+}
+.transparent-dialog .v-overlay__scrim {
+  background-color: rgba(0, 0, 0, 0.0) !important; /* Semi-transparent background */
+}
+.transparent-dialog .v-card {
+  background: rgba(255, 255, 255, 0.0) !important; /* Semi-transparent card background */
 }
 </style>

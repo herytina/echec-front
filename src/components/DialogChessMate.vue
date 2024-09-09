@@ -47,8 +47,10 @@
           <v-text-field
             v-model="mise"
             append-inner-icon="mdi-currency-usd"
+            :rules="[minRule]"
             variant="solo"
             required
+            @input="validateInput"
           />
 
           <v-slider
@@ -56,8 +58,9 @@
             :color="color"
             :step="1"
             max="20000"
-            min="1000"
+            min="500"
             track-color="grey"
+            class="mb-5"
           >
             <template #prepend>
               <v-btn
@@ -80,13 +83,21 @@
             </template>
           </v-slider>
 
-          <v-col class="text-left">
-            <span
-              class="text-h5 font-weight-light"
-              v-text="mise"
+          <v-row>
+            <div>
+              <span class="text-subheading">Durée de la partie :</span>
+            </div>
+
+            <v-select
+              v-if="mise >= 500"
+              v-model="timerOption"
+              variant="solo"
+              :items="selectItems"
+              class="mx-5"
+              style="width: 50px;"
             />
-            <span class="subheading font-weight-light me-1"> MGA</span>
-          </v-col>
+            <span>en minute</span>
+          </v-row>
         </v-card-text>
 
 
@@ -140,21 +151,34 @@ export default {
   },
   data() {
     return {
-      mise: 1000,
+      mise: 500,
+      timerOption:1,
       dialog: this.open,
       partyName : null,
       icon: require('@/assets/logo/checkmate.svg'),
-      players : []
+      players : [],
+      selectTimer: true,
+      minRule: value => value >= 500 || 'La mise minimum est de 500 ar',
     };
   },
   computed: {
-      color () {
-        if (this.mise < 5000) return 'red'
-        if (this.mise < 10000) return 'orange'
-        if (this.mise < 15000) return 'teal'
-        if (this.mise <= 20000) return 'green'
-        return 'green'
-      },
+    color () {
+      if (this.mise < 5000) return 'red'
+      if (this.mise < 10000) return 'orange'
+      if (this.mise < 15000) return 'teal'
+      if (this.mise <= 20000) return 'green'
+      return 'green'
+    },
+    selectItems() {
+      if (this.mise >= 500 && this.mise < 1000) {
+        return [1, 2, 3];
+      } else if (this.mise >= 1000 && this.mise < 3000) {
+        return [1, 2, 3, 4, 5, 6, 7];
+      } else if (this.mise >= 3000) {
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+      }
+      return [];
+    },
   },
   watch: {
     open(val) {
@@ -175,13 +199,21 @@ export default {
       this.mise++
     },
     postNewParty() {
-      createParty(this.partyName, this.mise,JSON.stringify([this.user]), 'created').then((data) => {
+      createParty(this.partyName, this.mise,JSON.stringify([this.user]), 'created',this.timerOption).then((data) => {
         if (data) {
           this.dialog = false;
           this.$emit('party', data.parties);
           this.$router.push({name: 'waitPlayer', query :{id:data.partyId.insertId}})
         }
       })
+    },
+    validateInput() {
+      if (this.mise !== '' && !/^\d+$/.test(this.mise)) {
+        this.mise = this.mise.replace(/\D/g, '');
+        if(this.mise >= 500){
+          this.selectTimer = false
+        }
+      }
     }
   }
 };

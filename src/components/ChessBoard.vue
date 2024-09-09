@@ -1,8 +1,8 @@
 <template>
   <div class="chessboard">
-    <div>
+    <div v-if="allPlayers.length > 0">
       <Players
-        :avatar-url="profilPlayer1"
+        :solde="solde = player1.piece ==='black' ? player1?.solde : player2?.solde"
         :player-name="name = player1.piece ==='black' ? player1?.name : player2?.name"
         :turn="currentPlayer.piece === 'black'"
       />
@@ -61,9 +61,9 @@
       <span class="digital-clock">{{ formatTime(whiteTime) }}</span>
     </div>
 
-    <div>
+    <div v-if="allPlayers.length > 0">
       <Players
-        :avatar-url="profilPlayer1"
+        :solde="solde = player1.piece ==='white' ? player1?.solde : player2?.solde"
         :player-name="name = player1.piece ==='white' ? player1?.name : player2?.name"
         :turn="currentPlayer.piece === 'white'"
       />
@@ -149,6 +149,45 @@
         </v-list-item>
       </v-list>
     </v-dialog>
+
+    <v-dialog
+      v-model="timeout"
+      max-width="600px"
+      persistent
+    >
+      <v-card>
+        <v-card-title>
+          La partie est terminer
+        </v-card-title>
+        <v-card-text>
+          <p>Félicitation !</p>
+          <p>Vous avez gagner {{ party.mise }} Ariary</p>
+        </v-card-text>
+        <template #actions>
+          <v-btn
+            flat
+            variant="tonal"
+            class="me-2 text-none"
+            size="small"
+            color="success"
+            @click="window.location.reload();"
+          >
+            Rejouer
+          </v-btn>
+          <v-spacer />
+          <v-btn
+            flat
+            variant="tonal"
+            class="me-2 text-none"
+            size="small"
+            color="error"
+            @click="$router.push('/')"
+          >
+            Fermer
+          </v-btn>
+        </template>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -184,8 +223,8 @@ export default {
         white: { left: false, right: false },
         black: { left: false, right: false }
       },
-      blackTime: 600,
-      whiteTime: 600,
+      blackTime: 60,
+      whiteTime: 60,
       topTimerRunning: false,
       bottomTimerRunning: false,
       topInterval: null,
@@ -194,16 +233,17 @@ export default {
       isMobile: window.innerWidth <= 768,
       audioWchess: require('@/assets/audio/chessKingHomme1.mp3'),
       audioBchess: require('@/assets/audio/chessKingFemme1.mp3'),
-      profilPlayer1: require('@/assets/logo.png'),
       dialogPromated: false,
+      timeout:false,
       promate : [],
       rowPromoted: 0,
       colPromoted: 0,
       kingAlreadyMoves: false,
       lastMove : null,
-      player1:{piece : 'white'},
-      player2:{piece : 'black'},
-      loading:true
+      player1:{piece : 'white', name:''},
+      player2:{piece : 'black', name:''},
+      loading:true,
+      allPlayers : []
     };
   },
   computed: {
@@ -223,19 +263,22 @@ export default {
             this.currentPlayer = player
           }
         })
+        this.blackTime = this.party.timer
+        this.whiteTime = this.party.timer
         this.toggleTimer(this.currentPlayer.piece)
         this.loading =false
       }
-    }, 2000);
+    }, 1000);
   },
+
   beforeUnmount() {
     window.removeEventListener('resize', this.checkPlatform);
     clearInterval(this.topInterval);
     clearInterval(this.bottomInterval);
   },
+
   created(){
     socket.onGameBoardUpdated(async (data) => {
-      console.log('Game board updated:', data);
       this.currentPlayer = data.currentPlayer
       this.board = data.board
       this.topTimerRunning = data.topTimerRunning
@@ -243,9 +286,9 @@ export default {
       this.lastMove = data.lastMove
       this.toggleTimer(this.currentPlayer.piece);
       await this.checkForCheck()
-      // Vous pouvez ajouter des actions à effectuer après la réception d'une mise à jour du tableau de jeu
     });
   },
+
   methods: {
     createBoard() {
       let board = [
@@ -260,15 +303,25 @@ export default {
       ];
       return board;
     },
+
     formatTime(seconds) {
       const minutes = Math.floor(seconds / 60);
       const remainingSeconds = seconds % 60;
       const time = `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`
       if (time === '0:00') {
-        console.log("🚀 ~ defaite pour :", this.currentPlayer.name)
+        this.timeout = true
+        this.allPlayers.forEach( player =>{
+          if(player.name === this.currentPlayer.name){
+            console.log('vaincu', player.name)
+          }else{
+            console.log('vainqueur', player.name)
+          }
+        })
+        return 
       }
       return time;
     },
+
     toggleTimer(playerColor) {
       this.currentPlayer.piece === 'white' ? this.topTimerRunning = true : this.topTimerRunning = false;
       this.currentPlayer.piece === 'black' ? this.bottomTimerRunning = true : this.bottomTimerRunning = false;
@@ -324,13 +377,28 @@ export default {
       if (!this.isCurrentUserTurn()) return;
 
       if (this.isValidMove(row, col)) {
-        this.processMove(row, col);
-        return;
+        if(!this.isSelectablePiece(selectedPiece)) await this.processMove(row, col);
+        // return;
       }
 
       if (this.isSelectablePiece(selectedPiece)) {
         await this.selectPieceAndFetchMoves(row, col, selectedPiece);
       }
+    },
+
+    async updatePartyboard() {
+      // Simuler une mise à jour du tableau de jeu avec un délai
+      return new Promise((resolve) => {
+        setTimeout(() => {
+            // this.board = this.board
+            // this.currentPlayer = this.currentPlayer
+            // this.topTimerRunning = this.topTimerRunning
+            // this.bottomTimerRunning =this.bottomTimerRunning,
+            // this.lastMove = this.lastMove
+            this.toggleTimer(this.currentPlayer.piece)
+          resolve();
+        }, 900);
+      });
     },
 
     isCurrentUserTurn() {
@@ -341,19 +409,20 @@ export default {
       return this.selectedPiece && this.validMoves && this.validMoves.some(move => move[0] === row && move[1] === col);
     },
 
-    processMove(row, col) {
+    async processMove(row, col) {
       this.movePiece(this.selectedPiece, [row, col]);
       this.switchTurn();
-      this.updateGameBoard();
+      await this.updateGameBoard();
     },
 
     switchTurn() {
       this.currentPlayer = this.currentPlayer.id === this.player1.id ? this.player2 : this.player1;
-      this.currentPlayer = this.currentPlayer.piece === 'white' ? this.player2 : this.player1
     },
 
-    updateGameBoard() {
+    async updateGameBoard() {
       try {
+        // await this.updatePartyboard()
+        this.toggleTimer(this.currentPlayer.piece)
         socket.updateGameBoard(
           this.party.id,
           this.board,

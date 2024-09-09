@@ -5,13 +5,13 @@ import { createRouter, createWebHistory } from 'vue-router';
 const router = createRouter({
   history: createWebHistory(process.env.BASE_URL),
   routes: [
+    // {
+    //   path: '/',
+    //   name: 'loginPage',
+    //   component: () => import('@/Pages/Login.vue')
+    // },
     {
       path: '/',
-      name: 'loginPage',
-      component: () => import('@/Pages/Login.vue')
-    },
-    {
-      path: '/listOfParty',
       name: 'ListPartyChess',
       component: () => import('@/Pages/ListPartyPage.vue')
     },

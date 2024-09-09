@@ -20,6 +20,16 @@ class SocketService {
     });
   }
 
+  readyToPlay(players){
+    this.socket.emit('readyToPlay',{
+      players
+    });
+  }
+
+  onReadyPlayer(callback) {
+    this.socket.on('readyToPlay', callback);
+  }
+
   onGameBoardUpdated(callback) {
     this.socket.on('gameBoardUpdated', callback);
   }

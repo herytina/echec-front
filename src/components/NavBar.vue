@@ -30,13 +30,15 @@
             </v-icon>
             <span class="ml-2">{{ user.solde }} MGA</span>
             <v-avatar
-              size="30"
+              size="50"
               class="ml-2"
             >
-              <img
-                :src="iconGame"
-                alt="logo"
-              >
+              <NameToAvatar
+                :name="user.name"
+                size="50"
+                :background-color="user.solde < 60000 ? '#ffc400' : '#09ff00'"
+                text-color="#ffffff"
+              />
             </v-avatar>
           </v-btn>
         </template>
@@ -60,8 +62,12 @@
 </template>
 <script>
 import { useStoreUser } from '@/stores/user.store';
+import NameToAvatar from '@/components/NameToAvatar.vue';
 
 export default {
+  components :{
+    NameToAvatar
+  },
   props: {
     bgColor: {
       type: String,
@@ -94,16 +100,16 @@ export default {
     }
   },
   methods: {
-    logout() {
-      const userStore = useStoreUser()
-      userStore.setUser({})
-      this.$router.push('/')
-    },
+    // logout() {
+    //   const userStore = useStoreUser()
+    //   userStore.setUser({})
+    //   this.$router.push('/')
+    // },
     parameter() {
       this.$router.push('/party')
     },
     compte() {
-      this.$router.push('/listOfParty')
+      this.$router.push('/')
     },
   }
 
