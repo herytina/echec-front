@@ -1,23 +1,13 @@
 <template>
   <div id="PartyChess">
-    <NavBarVue bg-color="party" />
+    <NavBarVue />
+    <GoodHeader />
     <ChessBoard />
   </div>
 </template>
 
-<script>
-import ChessBoard from '../components/ChessBoard.vue';
-import NavBarVue from '../components/NavBar.vue';
-export default {
-  name: 'PartyChess',
-  components: {
-    ChessBoard,
-    NavBarVue
-  }
-}
+<script setup lang="ts">
+  import ChessBoard from '../components/ChessBoard.vue';
+  import NavBarVue from '../components/NavBar.vue';
+  import GoodHeader from '@/components/GoodHeader.vue';
 </script>
-<style>
-#PartyChess {
-  background-color: rgb(219, 205, 176);
-}
-</style>

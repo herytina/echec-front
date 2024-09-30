@@ -6,7 +6,7 @@
     >
       <NameToAvatar
         :name="playerName"
-        size="54"
+        :size=54
         :background-color="solde < 60000 ? '#ffc400' : '#09ff00'"
         text-color="#ffffff"
       />
@@ -23,36 +23,22 @@
   </div>
 </template>
 
-<script>
-import NameToAvatar from '@/components/NameToAvatar.vue';
-import { useStoreUser } from '@/stores/user.store';
+<script setup lang="ts">
+  import NameToAvatar from '@/components/NameToAvatar.vue';
+  import { useUserStore } from '@/stores/user.store';
 
-export default {
-  name: 'PlayerChess',
-  components :{
-    NameToAvatar
-  },
-  props: {
-    solde: {
-      type: Number,
-      required: true
-    },
-    playerName: {
-      type: String,
-      required: true
-    },
-    turn: {
-      type: Boolean,
-      required: true
-    }
-  },
-  setup() {
-    const userStore = useStoreUser();
-    return {
-      user: userStore.user,
-    };
-  },
-}
+  // Props définies avec `defineProps` et typage explicite
+  interface Props {
+    solde: number;
+    playerName: string;
+    turn: boolean;
+  }
+
+  const props = defineProps<Props>();
+
+  // Utilisation du store Pinia
+  const userStore = useUserStore();
+  const user = userStore.user;
 </script>
 
 <style scoped>

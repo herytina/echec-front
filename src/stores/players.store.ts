@@ -13,7 +13,7 @@ export const usePlayerStore = defineStore('players', {
     }],
   }),
   actions: {
-    setPlayers(players) {
+    setPlayers(players:any) {
       this.players = players
     },
   },

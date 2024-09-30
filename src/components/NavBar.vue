@@ -61,21 +61,15 @@
   </v-toolbar>
 </template>
 <script>
-import { useStoreUser } from '@/stores/user.store';
+import { useUserStore } from '@/stores/user.store';
 import NameToAvatar from '@/components/NameToAvatar.vue';
 
 export default {
   components :{
     NameToAvatar
   },
-  props: {
-    bgColor: {
-      type: String,
-      require:false
-    }
-  },
   setup() {
-    const userStore = useStoreUser();
+    const userStore = useUserStore();
     return {
       user: userStore.user,
     };
@@ -117,14 +111,6 @@ export default {
 
 </script>
 <style scoped>
-.party {
-  background-color: #d2992f; /* Couleur de fond personnalisée */
-  color: white; /* Couleur du texte */
-}
-.global{
-  color:#d2992f;
-  margin-bottom: 20px;
-}
 .icon-text {
   display: flex;
   align-items: center;

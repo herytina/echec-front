@@ -1,7 +1,7 @@
 <template>
   <div v-if="party">
-    <NavBarVue bg-color="global" />
-    
+    <NavBarVue />
+    <GoodHeader />
     <div class="mt-7">
       <v-sheet
         class="pa-4 text-center mx-auto"
@@ -70,7 +70,7 @@
         <v-col>
           <NameToAvatar
             :name="JSON.parse(party.players)[0].name"
-            size="50"
+            :size=50
             background-color="#ffc400"
             text-color="#ffffff"
           />
@@ -111,7 +111,7 @@
           <div v-if="JSON.parse(party.players)[1]">
             <NameToAvatar
               :name="JSON.parse(party.players)[1].name"
-              size="50"
+              :size=50
               background-color="#09ff00"
               text-color="#ffffff"
             />
@@ -134,8 +134,8 @@
       color="warning"
       class="pa-16"
     >
-      {{ JSON.parse(party.players)[0].piece === 'white' && JSON.parse(party.players)[0].id === user.id || 
-        JSON.parse(party.players)[1].piece === 'white' && JSON.parse(party.players)[1].id === user.id ? 'Vous êtes blanc' : 'Vous êtes Noire' }}
+      {{ JSON.parse(party.players)[0].piece === 'white' && JSON.parse(party.players)[0].id === userStore.user.id || 
+        JSON.parse(party.players)[1].piece === 'white' && JSON.parse(party.players)[1].id === userStore.user.id ? 'Vous êtes blanc' : 'Vous êtes Noire' }}
       <template #actions>
         <v-btn
           color="red"
@@ -190,173 +190,172 @@
   </div>
 </template>
 
-<script>
-import { useStoreUser } from '@/stores/user.store';
-import { getPartybyId, updateParty } from '@/utils/partyApi';
-import NavBarVue from '../components/NavBar.vue';
-import { usePartyStore } from '@/stores/party.store';
-import socket from '@/services/socket';
-import NameToAvatar from '@/components/NameToAvatar.vue';
-import { usePlayerStore } from '@/stores/players.store';
+<script setup lang="ts">
+  import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
+  import { useUserStore } from '@/stores/user.store';
+  import { getPartyById, updateParty } from '@/utils/partyApi';
+  import { usePartyStore } from '@/stores/party.store';
+  import { usePlayerStore } from '@/stores/players.store';
+  import socket from '@/services/socket';
+  import NavBarVue from '../components/NavBar.vue';
+  import GoodHeader from '@/components/GoodHeader.vue';
+  import NameToAvatar from '@/components/NameToAvatar.vue';
 
-export default{
-  name:"WaitPlayer",
-  components :{
-    NavBarVue,
-    NameToAvatar
-  },
-  setup() {
-    const userStore = useStoreUser();
-    return {
-      user: userStore.user,
-    };
-  },
-  data(){
-    return{
-      party:null,
-      isFullPlayer:false,
-      snackbar:false,
-      pieceChoise : [
-        {color:'white', image:require('@/assets/chess-p/white-king.svg')},
-        {color:'black',image:require('@/assets/chess-p/black-king.svg')}
-      ],
-      selectedPiece : false,
-      vs : require('@/assets/logo/vs.png'),
-      players:[],
-      allReadyPlayer:false,
-      onReady: false,
-      label : 0,
-      intervalId: null,
-      playersWithStatus : []
+  const userStore = useUserStore();
+  const party = ref<any>(null); // Utilisez le type approprié pour vos données de party
+  const isFullPlayer = ref<boolean>(false);
+  const snackbar = ref<boolean>(false);
+  const selectedPiece = ref<boolean>(false);
+  const players = ref<any[]>([]); // Utilisez le type approprié
+  const allReadyPlayer = ref<boolean>(false);
+  const onReady = ref<boolean>(false);
+  const label = ref<number>(0);
+  const intervalId = ref<number>(1); // Type pour l'intervalle
+  const playersWithStatus = ref<any[]>([]); // Utilisez le type approprié
+
+  const pieceChoise = ref([
+    { color: 'white', image: new URL('@/assets/chess-p/white-king.svg', import.meta.url).href },
+    { color: 'black', image: new URL('@/assets/chess-p/black-king.svg', import.meta.url).href }
+  ]);
+  const vs = new URL('@/assets/logo/vs.png', import.meta.url).href;
+
+  const allStatusReady = computed(() => {
+    return party.value?.every((item: any) => item.status && item.status === 'ready') || false; // Remplacez 'any' par un type approprié
+  });
+
+  // Socket event listeners
+  socket.onPartyListUpdated((response: any) => { // Remplacez 'any' par un type approprié
+    party.value = response.data[0];
+    isFullPlayer.value = JSON.parse(party.value.players).length === 2;
+  });
+
+  socket.onPartySelected(async () => {
+    const partyStore = usePartyStore();
+    party.value = await getPartyById(party.value.id);
+    partyStore.setParty(party.value);
+    selectedPiece.value = true;
+    snackbar.value = true;
+  });
+
+  socket.onReadyPlayer(async (response: any) => { // Remplacez 'any' par un type approprié
+    const playerStore = usePlayerStore();
+    const playersSocket = response.players;
+    playerStore.setPlayers(playersSocket);
+    players.value = playerStore.players;
+    allReadyPlayer.value = players.value.every((item: any) => 'status' in item); // Remplacez 'any' par un type approprié
+    playersWithStatus.value = players.value.filter((item: any) => 'status' in item);
+    if (allReadyPlayer.value) {
+      onReady.value = false;
+      // Redirection
+      // Utilisez `useRouter` si vous voulez faire une redirection
     }
-  },
-  computed: {
-    allStatusReady() {
-      return this.party.every(item => item.status && item.status === 'ready');
-    }
-  },
-  created(){
-    socket.onPartyListUpdated((response)=>{
-      this.party = response.data[0];
-      JSON.parse(this.party.players).length === 2 ? this.isFullPlayer = true : this.isFullPlayer = false;
-    })
-    socket.onPartySelected(async ()=>{
-      const partyStore = usePartyStore()
-      this.party = await getPartybyId(this.party.id);
-      partyStore.setParty(this.party);
-      this.selectedPiece = true;
-      this.snackbar=true
-    })
-    socket.onReadyPlayer(async (response)=>{
-      const playerStore = usePlayerStore()
-      const playersSocket = response.players;
-      playerStore.setPlayers(playersSocket)
-      this.players = playerStore.players
-      this.allReadyPlayer = this.players.every(item => 'status' in item);
-      this.playersWithStatus = this.players.filter(item => 'status' in item);
-      if(this.allReadyPlayer){
-        this.onReady = false
-        this.$router.push('/party')
-      }
-    })
-  },
-  async mounted() {
+  });
+
+  // Mounted lifecycle hook
+  onMounted(async () => {
     try {
-      const id = this.$route.query.id;
-      if(id !== null){
-        this.party = await getPartybyId(id);
-        JSON.parse(this.party.players).length === 2 ? this.isFullPlayer = true : this.isFullPlayer = false;
+      const id = new URLSearchParams(window.location.search).get('id'); // Utilisez l'API URL pour extraire les paramètres de l'URL
+      if (id) {
+        party.value = await getPartyById(id);
+        isFullPlayer.value = JSON.parse(party.value.players).length === 2;
       }
     } catch (error) {
       console.error('fetch party failed', error);
     }
-  },
-  beforeUnmount() {
-    // Nettoyer l'intervalle lors de la destruction du composant
-    clearInterval(this.intervalId);
-  },
-  methods:{
-    async updateStatus() {
-      // Simuler une mise à jour du tableau de jeu avec un délai
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          this.allReadyPlayer = this.players.every(item => 'status' in item);
-          if(this.allReadyPlayer){
-            this.$router.push('/party')
-          }
-          resolve();
-        }, 1000);
-      });
-    },
-    async choiseColor(color){
-      if(JSON.parse(this.party.players).length === 2){
-        let player1
-        let player2
-        JSON.parse(this.party.players).forEach(player => {
-          if(color === 'white'){
-            if(player.id === this.user.id){
-                player.piece = color
-                player1 = player
-            }else{
-                player.piece = 'black'
-                player2 = player
-            }
-          }
-          if(color === 'black'){
-            if(player.id === this.user.id){
-                player.piece = color
-                player1 = player
-            }else{
-                player.piece = 'white'
-                player2 = player
-            }
-          }
-        });
-        const players = [player1,player2]
-        await updateParty(this.party.id, JSON.stringify(players),'matching');
-      }
+  });
 
-    },
-    async goToboard(){
-      const playerStore = usePlayerStore() 
-      let tmpPlayer = this.players.length === 0 ? JSON.parse(this.party.players) : this.players
-      let tmpPlayer1 = tmpPlayer[0]
-      let tmpPlayer2 = tmpPlayer[1]
-      if(this.user.id === tmpPlayer1.id){
-        tmpPlayer1.status = 'ready'
-      }else if(this.user.id === tmpPlayer2.id){
-        tmpPlayer2.status = 'ready'
-      }
-      this.players = [tmpPlayer1, tmpPlayer2]
-      playerStore.setPlayers(this.players);
-      this.players = playerStore.players
-      console.log(this.players)
-      this.onReady = true
-      if (this.onReady) {
-        // Démarrer l'incrémentation du label chaque seconde
-        this.intervalId = setInterval(() => {
-          this.label += 1;
-          if (this.label >= 30) {
-            this.onReady = false;
-            clearInterval(this.intervalId);
-            this.label = 0; // Réinitialiser le label
-          }
-        }, 1000);
-      } else {
-        // Arrêter l'incrémentation du label et réinitialiser la valeur
-        clearInterval(this.intervalId);
-        this.label = 0;
-      }
-      try{
-        await this.updateStatus()
-        socket.readyToPlay(this.players)
-      }catch(error){
-        console.error('error to up players', error)
-      }
+  // BeforeUnmount lifecycle hook
+  onBeforeUnmount(() => {
+    // Nettoyer l'intervalle lors de la destruction du composant
+    if (intervalId.value) {
+      clearInterval(intervalId.value);
     }
-  }
-}
+  });
+
+  // Methods
+  const updateStatus = async () => {
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        allReadyPlayer.value = players.value.every((item: any) => 'status' in item); // Remplacez 'any' par un type approprié
+        if (allReadyPlayer.value) {
+          // Redirection
+          // Utilisez `useRouter` si vous voulez faire une redirection
+        }
+        resolve();
+      }, 1000);
+    });
+  };
+
+  const choiseColor = async (color: string) => {
+    if (JSON.parse(party.value.players).length === 2) {
+      let player1: any, player2: any; // Remplacez 'any' par un type approprié
+      JSON.parse(party.value.players).forEach((player: any) => { // Remplacez 'any' par un type approprié
+        if (color === 'white') {
+          if (player.id === userStore.user.id) {
+            player.piece = color;
+            player1 = player;
+          } else {
+            player.piece = 'black';
+            player2 = player;
+          }
+        }
+        if (color === 'black') {
+          if (player.id === userStore.user.id) {
+            player.piece = color;
+            player1 = player;
+          } else {
+            player.piece = 'white';
+            player2 = player;
+          }
+        }
+      });
+      const playersArray = [player1, player2];
+      await updateParty(party.value.id, JSON.stringify(playersArray), 'matching');
+    }
+  };
+
+  const goToboard = async () => {
+    const playerStore = usePlayerStore();
+    let tmpPlayer = players.value.length === 0 ? JSON.parse(party.value.players) : players.value;
+    let tmpPlayer1 = tmpPlayer[0];
+    let tmpPlayer2 = tmpPlayer[1];
+
+    if (userStore.user.id === tmpPlayer1.id) {
+      tmpPlayer1.status = 'ready';
+    } else if (userStore.user.id === tmpPlayer2.id) {
+      tmpPlayer2.status = 'ready';
+    }
+    
+    players.value = [tmpPlayer1, tmpPlayer2];
+    playerStore.setPlayers(players.value);
+    
+    onReady.value = true;
+
+    if (onReady.value) {
+      // Démarrer l'incrémentation du label chaque seconde
+      intervalId.value = setInterval(() => {
+        label.value += 1;
+        if (label.value >= 30) {
+          onReady.value = false;
+          clearInterval(intervalId.value);
+          label.value = 0; // Réinitialiser le label
+        }
+      }, 1000);
+    } else {
+      // Arrêter l'incrémentation du label et réinitialiser la valeur
+      clearInterval(intervalId.value);
+      label.value = 0;
+    }
+    
+    try {
+      await updateStatus();
+      socket.readyToPlay(players.value);
+    } catch (error) {
+      console.error('error to up players', error);
+    }
+  };
 </script>
+
 
 <style scoped>
 

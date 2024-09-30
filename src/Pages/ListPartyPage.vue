@@ -1,6 +1,7 @@
 <template>
   <div>
     <NavBarVue bg-color="global" />
+    <GoodHeader />
     <PartyList v-model:newParty="newPartyList" />
     <div>
       <DialogChessMate
@@ -24,34 +25,25 @@
   </div>
 </template>
 
-<script>
-import PartyList from '@/components/PartyList.vue';
-import DialogChessMate from '../components/DialogChessMate.vue';
-import NavBarVue from '../components/NavBar.vue';
+<script setup lang="ts">
+  import { ref } from 'vue';
+  import PartyList from '@/components/PartyList.vue';
+  import DialogChessMate from '../components/DialogChessMate.vue';
+  import NavBarVue from '../components/NavBar.vue';
+  import GoodHeader from '@/components/GoodHeader.vue';
 
+  // État réactif
+  const openDialog = ref<boolean>(false);
+  const newPartyList = ref<any[]>([]); // Utilisez le type approprié si vous avez une interface définie
 
-export default {
-  name: 'ListPartyPage',
-  components: {
-    NavBarVue,
-    PartyList,
-    DialogChessMate
-  },
-  data() {
-    return {
-      openDialog: false,
-      newPartyList : []
-    }
-  },
-  methods: {
-    setParty() {
-      this.openDialog = true
-    },
-    fetchParty(data) {
-      this.newPartyList = data
-    }
-  }
-}
+  // Méthodes
+  const setParty = () => {
+    openDialog.value = true;
+  };
+
+  const fetchParty = (data: any[]) => { // Remplacez 'any' par le type approprié pour vos données
+    newPartyList.value = data;
+  };
 </script>
 
 <style scoped>

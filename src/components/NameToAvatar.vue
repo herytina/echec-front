@@ -15,61 +15,54 @@
   </div>
 </template>
   
-  <script>
-  export default {
-    props: {
-      name: {
-        type: String,
-        required: true,
-      },
-      size: {
-        type: Number,
-        default: 100,
-      },
-      backgroundColor: {
-        type: String,
-        default: '#0000ff',
-      },
-      textColor: {
-        type: String,
-        default: '#ffffff',
-      },
-    },
-    data() {
-      return {
-        avatarUrl: '',
-      };
-    },
-    computed: {
-      initials() {
-        return this.name.substring(0, 2).toUpperCase();
-      },
-    },
-    mounted() {
-      this.generateAvatar();
-    },
-    methods: {
-      generateAvatar() {
-        const canvas = this.$refs.canvas;
-        const context = canvas.getContext('2d');
-  
-        // Dessiner le fond
-        context.fillStyle = this.backgroundColor;
-        context.fillRect(0, 0, this.size, this.size);
-  
-        // Dessiner les initiales
-        context.fillStyle = this.textColor;
-        context.font = `${this.size / 2}px Arial`;
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.fillText(this.initials, this.size / 2, this.size / 2);
-  
-        // Convertir en URL de données
-        this.avatarUrl = canvas.toDataURL();
-      },
-    },
+<script setup lang="ts">
+  import { ref, computed, onMounted } from 'vue';
+
+  // Props typées avec `defineProps`
+  interface Props {
+    name: string;
+    size?: number;
+    backgroundColor?: string;
+    textColor?: string;
+  }
+
+  const props = defineProps<Props>();
+
+  // Données locales (équivalent à `data()`)
+  const avatarUrl = ref<string>('');
+
+  // Calcul des initiales (équivalent à `computed`)
+  const initials = computed(() => props.name.substring(0, 2).toUpperCase());
+
+  // Méthode pour générer l'avatar (équivalent à `methods`)
+  const generateAvatar = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = props.size || 100;
+    canvas.height = props.size || 100;
+    
+    const context = canvas.getContext('2d');
+    if (!context) return;
+
+    // Dessiner le fond
+    context.fillStyle = props.backgroundColor || '#0000ff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Dessiner les initiales
+    context.fillStyle = props.textColor || '#ffffff';
+    context.font = `${(props.size || 100) / 2}px Arial`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(initials.value, (props.size || 100) / 2, (props.size || 100) / 2);
+
+    // Convertir en URL de données
+    avatarUrl.value = canvas.toDataURL();
   };
-  </script>
+
+  // Utilisation de `onMounted` pour exécuter la méthode après le montage du composant
+  onMounted(() => {
+    generateAvatar();
+  });
+</script>
   
   <style scoped>
   img {

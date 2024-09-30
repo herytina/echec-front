@@ -13,7 +13,7 @@ export const usePartyStore = defineStore('party', {
     },
   }),
   actions: {
-    setParty(party) {
+    setParty(party:any) {
       this.party = party
     },
   },

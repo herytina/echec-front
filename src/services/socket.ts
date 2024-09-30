@@ -1,14 +1,16 @@
 // socketService.js
-import io from 'socket.io-client';
+import {io, Socket} from 'socket.io-client';
 
 class SocketService {
+  private socket: Socket;
+
   constructor() {
     this.socket = io('http://localhost:3000', {
       withCredentials: true
     });
   }
 
-  updateGameBoard(partyId, board, status, currentPlayer, topTimerRunning, bottomTimerRunning, lastMove) {
+  updateGameBoard(partyId:number, board:any, status: string, currentPlayer:any, topTimerRunning:boolean, bottomTimerRunning :boolean, lastMove:any) {
     this.socket.emit('gameBoardUpdated', {
       partyId,
       board,
@@ -20,29 +22,29 @@ class SocketService {
     });
   }
 
-  readyToPlay(players){
+  readyToPlay(players:any){
     this.socket.emit('readyToPlay',{
       players
     });
   }
 
-  onReadyPlayer(callback) {
+  onReadyPlayer(callback:any) {
     this.socket.on('readyToPlay', callback);
   }
 
-  onGameBoardUpdated(callback) {
+  onGameBoardUpdated(callback:any) {
     this.socket.on('gameBoardUpdated', callback);
   }
 
-  onPartyListUpdated(callback) {
+  onPartyListUpdated(callback:any) {
     this.socket.on('partyListUpdated', callback);
   }
 
-  onNewParty(callback) {
+  onNewParty(callback:any) {
     this.socket.on('newParty', callback);
   }
 
-  onPartySelected(callback) {
+  onPartySelected(callback:any) {
     this.socket.on('partySelected', callback);
   }
 }

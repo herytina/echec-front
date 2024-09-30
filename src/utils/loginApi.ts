@@ -1,6 +1,6 @@
 import { apiClient, URL } from "./httpClient";
 
-export const verifyUser = async(name,pwd) => {
+export const verifyUser = async(name: string,pwd : string) => {
   try {
     const response = await apiClient.post(`${URL}/login`, {
       name,pwd

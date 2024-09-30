@@ -1,12 +1,21 @@
 import { apiClient, URL } from "./httpClient";
 
-export const getKnightMoves = async (row, col, isWhite, board) => {
+interface Board {
+  [key: string]: any;
+}
+
+export const getKnightMoves = async (
+  row: number,
+  col: number,
+  isWhite: boolean,
+  board: Board
+): Promise<any[]> => {
   try {
     const response = await apiClient.post(`${URL}/knight-moves`, {
       row,
       col,
       isWhite,
-      board
+      board,
     });
     return response.data.moves;
   } catch (error) {
@@ -15,14 +24,20 @@ export const getKnightMoves = async (row, col, isWhite, board) => {
   }
 };
 
-export const getPawnsMoves = async (row, col, isWhite, board, lastMove) => {
+export const getPawnsMoves = async (
+  row: number,
+  col: number,
+  isWhite: boolean,
+  board: Board,
+  lastMove: any
+): Promise<any[]> => {
   try {
     const response = await apiClient.post(`${URL}/pawns-moves`, {
       row,
       col,
       isWhite,
       board,
-      lastMove
+      lastMove,
     });
     return response.data.moves;
   } catch (error) {
@@ -31,13 +46,18 @@ export const getPawnsMoves = async (row, col, isWhite, board, lastMove) => {
   }
 };
 
-export const getBishopMoves = async (row, col, isWhite, board) => {
+export const getBishopMoves = async (
+  row: number,
+  col: number,
+  isWhite: boolean,
+  board: Board
+): Promise<any[]> => {
   try {
     const response = await apiClient.post(`${URL}/bishop-moves`, {
       row,
       col,
       isWhite,
-      board
+      board,
     });
     return response.data.moves;
   } catch (error) {
@@ -46,13 +66,18 @@ export const getBishopMoves = async (row, col, isWhite, board) => {
   }
 };
 
-export const getRookMoves = async (row, col, isWhite, board) => {
+export const getRookMoves = async (
+  row: number,
+  col: number,
+  isWhite: boolean,
+  board: Board
+): Promise<any[]> => {
   try {
     const response = await apiClient.post(`${URL}/rook-moves`, {
       row,
       col,
       isWhite,
-      board
+      board,
     });
     return response.data.moves;
   } catch (error) {
@@ -61,13 +86,18 @@ export const getRookMoves = async (row, col, isWhite, board) => {
   }
 };
 
-export const getKingMoves = async (row, col, isWhite, board) => {
+export const getKingMoves = async (
+  row: number,
+  col: number,
+  isWhite: boolean,
+  board: Board
+): Promise<any[]> => {
   try {
     const response = await apiClient.post(`${URL}/king-moves`, {
       row,
       col,
       isWhite,
-      board
+      board,
     });
     return response.data.moves;
   } catch (error) {
@@ -76,7 +106,14 @@ export const getKingMoves = async (row, col, isWhite, board) => {
   }
 };
 
-export const getKingRookMoves = async (row, col, direction, kingMoved, isWhite, board) => {
+export const getKingRookMoves = async (
+  row: number,
+  col: number,
+  direction: string,
+  kingMoved: boolean,
+  isWhite: boolean,
+  board: Board
+): Promise<any[]> => {
   try {
     const response = await apiClient.post(`${URL}/king-to-rook`, {
       row,
@@ -84,7 +121,7 @@ export const getKingRookMoves = async (row, col, direction, kingMoved, isWhite, 
       direction,
       kingMoved,
       isWhite,
-      board
+      board,
     });
     return response.data.moves;
   } catch (error) {

@@ -192,7 +192,7 @@
 </template>
 
 <script>
-import { useStoreUser } from '@/stores/user.store';
+import { useUserStore } from '@/stores/user.store';
 import { getBishopMoves, getKingMoves, getKingRookMoves, getKnightMoves, getPawnsMoves, getRookMoves } from '@/utils/movesApi';
 import DialogChessMate from './DialogChessMate.vue';
 import Players from './Players.vue';
@@ -205,7 +205,7 @@ export default {
     Players
   },
   setup() {
-    const userStore = useStoreUser();
+    const userStore = useUserStore();
     const partyStore = usePartyStore();
     return {
       user: userStore.user,

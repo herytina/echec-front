@@ -126,98 +126,115 @@
 </template>
 
 
+<script setup lang="ts">
+  import { ref, computed, watch } from 'vue';
+  import { useRouter } from 'vue-router';
+  import { useUserStore } from '@/stores/user.store';
+  import { createParty } from '@/utils/partyApi';
 
-<script>
-import { useStoreUser } from '@/stores/user.store';
-import { createParty } from '@/utils/partyApi';
-
-export default {
-  name: 'DialogChess',
-  props: {
-    open: {
-      type: Boolean,
-      required: true
-    },
-    chessMate: {
-      type: Boolean,
-      required: true
-    }
-  },
-  setup() {
-    const userStore = useStoreUser();
-    return {
-      user: userStore.user,
-    };
-  },
-  data() {
-    return {
-      mise: 500,
-      timerOption:1,
-      dialog: this.open,
-      partyName : null,
-      icon: require('@/assets/logo/checkmate.svg'),
-      players : [],
-      selectTimer: true,
-      minRule: value => value >= 500 || 'La mise minimum est de 500 ar',
-    };
-  },
-  computed: {
-    color () {
-      if (this.mise < 5000) return 'red'
-      if (this.mise < 10000) return 'orange'
-      if (this.mise < 15000) return 'teal'
-      if (this.mise <= 20000) return 'green'
-      return 'green'
-    },
-    selectItems() {
-      if (this.mise >= 500 && this.mise < 1000) {
-        return [1, 2, 3];
-      } else if (this.mise >= 1000 && this.mise < 3000) {
-        return [1, 2, 3, 4, 5, 6, 7];
-      } else if (this.mise >= 3000) {
-        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-      }
-      return [];
-    },
-  },
-  watch: {
-    open(val) {
-      this.dialog = val;
-    },
-    dialog(val) {
-      this.$emit('update:open', val);
-    }
-  },
-  methods: {
-    closeDialog() {
-      this.dialog = false;
-    },
-    decrement () {
-        this.mise--
-    },
-    increment () {
-      this.mise++
-    },
-    postNewParty() {
-      createParty(this.partyName, this.mise,JSON.stringify([this.user]), 'created',this.timerOption).then((data) => {
-        if (data) {
-          this.dialog = false;
-          this.$emit('party', data.parties);
-          this.$router.push({name: 'waitPlayer', query :{id:data.partyId.insertId}})
-        }
-      })
-    },
-    validateInput() {
-      if (this.mise !== '' && !/^\d+$/.test(this.mise)) {
-        this.mise = this.mise.replace(/\D/g, '');
-        if(this.mise >= 500){
-          this.selectTimer = false
-        }
-      }
-    }
+  interface PartyResponse {
+    parties: any[];
+    partyId: { insertId: number };
   }
-};
+
+  // Props definition
+  const props = defineProps<{
+    open: boolean;
+    chessMate: boolean;
+  }>();
+
+  const emit = defineEmits(['update:open', 'party']);
+
+  // User store
+  const userStore = useUserStore();
+  const user = userStore.user;
+
+  // Reactive state
+  const mise = ref(500);
+  const timerOption = ref(1);
+  const dialog = ref(props.open);
+  const partyName = ref<string>('');
+  const icon = new URL('@/assets/logo/checkmate.svg', import.meta.url).href;
+  const players = ref<any[]>([]);
+  const selectTimer = ref(true);
+
+  // Custom validation rule
+  const minRule = (value: number) => value >= 500 || 'La mise minimum est de 500 ar';
+
+  // Computed properties
+  const color = computed(() => {
+    if (mise.value < 5000) return 'red';
+    if (mise.value < 10000) return 'orange';
+    if (mise.value < 15000) return 'teal';
+    return 'green';
+  });
+
+  const selectItems = computed(() => {
+    if (mise.value >= 500 && mise.value < 1000) {
+      return [1, 2, 3];
+    } else if (mise.value >= 1000 && mise.value < 3000) {
+      return [1, 2, 3, 4, 5, 6, 7];
+    } else if (mise.value >= 3000) {
+      return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    }
+    return [];
+  });
+
+  // Watchers
+  watch(() => props.open, (val) => {
+    dialog.value = val;
+  });
+
+  watch(dialog, (val) => {
+    emit('update:open', val);
+  });
+
+  // Methods
+  const closeDialog = () => {
+    dialog.value = false;
+  };
+
+  const decrement = () => {
+    if (mise.value > 500) mise.value--;
+  };
+
+  const increment = () => {
+    mise.value++;
+  };
+
+  const postNewParty = async () => {
+    try {
+      const data: PartyResponse = await createParty(
+        partyName.value, 
+        mise.value, 
+        JSON.stringify([user]), 
+        'created', 
+        timerOption.value
+      );
+      if (data) {
+        dialog.value = false;
+        emit('party', data.parties);
+        router.push({ name: 'waitPlayer', query: { id: data.partyId.insertId } });
+      }
+    } catch (error) {
+      console.error('Error creating party:', error);
+    }
+  };
+
+  const validateInput = () => {
+    const miseString = mise.value.toString();
+    if (miseString !== '' && !/^\d+$/.test(miseString)) {
+      mise.value = parseInt(miseString.replace(/\D/g, ''), 10);
+      if (mise.value >= 500) {
+        selectTimer.value = false;
+      }
+    }
+  };
+
+  // Router
+  const router = useRouter();
 </script>
+
 
 <style scoped>
 /* Ajoutez des styles personnalisés si nécessaire */

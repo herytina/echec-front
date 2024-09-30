@@ -44,91 +44,95 @@
     </v-list-item>
   </div>
 </template>
-<script>
-import { useStoreUser } from '@/stores/user.store';
-import { getAllParty, getPartybyId, updateParty } from '@/utils/partyApi';
-import socket from '@/services/socket';
 
-export default {
-  props: {
-    newParty: {
-      type: Array,
-      require :true
-    }
-  },
-  setup() {
-    const userStore = useStoreUser();
-    return {
-      user: userStore.user,
-    };
-  },
-  data(){
-    return {
-      avatar: require('@/assets/logo/money.svg'),
-      partyLists: this.newParty,
-      isPlayer : false
-    }
-  },
-  watch: {
-    newParty(val) {
-      this.partyLists = val;
-    }
-  },
-  async mounted() {
-    await this.fetchAllParty()
-  },
-  created(){
-    socket.onNewParty((response) => {
-      this.partyLists = response.data;
-    });
-  },
-  methods:{
-    playParty(id) {
-      let user = this.user
-      getPartybyId(id).then(async (party) => {
-        let player1 = JSON.parse(party.players)[0]
-        if(!this.isEqual(player1, user) && party.mise < user.solde){
-          this.isPlayer =false
-          let players = [player1]
-          players.push(user)
-          await updateParty(id, JSON.stringify(players),'en cours');
-          this.$router.push({name: 'waitPlayer', query :{id:id}})
-        }else if(this.isEqual(player1, user)){
-          this.$router.push({name: 'waitPlayer', query :{id:id}})
-        }else{
-          this.isPlayer = true
-        }
-      })
-    },
-    isEqual(obj1, obj2) {
-      if (obj1 === obj2) return true;
+<script setup lang="ts">
+  import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
+  import { useRouter } from 'vue-router';
+  import { useUserStore } from '@/stores/user.store';
+  import { getAllParty, getPartyById, updateParty } from '@/utils/partyApi';
+  import socket from '@/services/socket';
 
-      if (typeof obj1 !== 'object' || obj1 === null ||
-          typeof obj2 !== 'object' || obj2 === null) {
-        return false;
-      }
-
-      const keys1 = Object.keys(obj1);
-      const keys2 = Object.keys(obj2);
-
-      if (keys1.length !== keys2.length) return false;
-
-      for (let key of keys1) {
-        if (!keys2.includes(key) || !this.isEqual(obj1[key], obj2[key])) {
-          return false;
-        }
-      }
-
-      return true;
-    },
-    async fetchAllParty() {
-      this.partyLists = await getAllParty()
-    }
+  interface Party {
+    players: string;
+    mise: number;
   }
 
-}
+  const props = defineProps<{
+    newParty: Array<any>
+  }>();
 
+  const avatar = new URL('@/assets/logo/money.svg', import.meta.url).href;
+  const partyLists = ref(props.newParty);
+  const isPlayer = ref(false);
+
+  const userStore = useUserStore();
+  const user = userStore.user;
+  const router = useRouter();
+
+  // Watch for newParty prop changes
+  watch(() => props.newParty, (val) => {
+    partyLists.value = val;
+  });
+
+  // Fetch all parties on mount
+  const fetchAllParty = async () => {
+    partyLists.value = await getAllParty();
+  };
+
+  onMounted(async () => {
+    await fetchAllParty();
+    socket.onNewParty((response: { data: any }) => {
+      partyLists.value = response.data;
+    });
+  });
+
+  // Cleanup socket listener before unmounting
+  onBeforeUnmount(() => {
+    socket.onNewParty((response: { data: any }) => {
+      console.log(response.data);
+    });
+  });
+
+  const playParty = async (id: number) => {
+    const party: Party = await getPartyById(id);
+    const player1 = JSON.parse(party.players)[0];
+
+    if (!isEqual(player1, user) && party.mise < user.wallet.balance) {
+      isPlayer.value = false;
+      const players = [player1, user];
+      await updateParty(id, JSON.stringify(players), 'en cours');
+      router.push({ name: 'waitPlayer', query: { id } });
+    } else if (isEqual(player1, user)) {
+      router.push({ name: 'waitPlayer', query: { id } });
+    } else {
+      isPlayer.value = true;
+    }
+  };
+
+  // Function to compare objects
+  const isEqual = (obj1: any, obj2: any): boolean => {
+    if (obj1 === obj2) return true;
+
+    if (typeof obj1 !== 'object' || obj1 === null || 
+        typeof obj2 !== 'object' || obj2 === null) {
+      return false;
+    }
+
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
+
+    if (keys1.length !== keys2.length) return false;
+
+    for (const key of keys1) {
+      if (!keys2.includes(key) || !isEqual(obj1[key], obj2[key])) {
+        return false;
+      }
+    }
+
+    return true;
+  };
 </script>
+
 
 <style scoped>
   .list{
