@@ -3,12 +3,13 @@ import { defineStore } from 'pinia'
 export const usePartyStore = defineStore('party', {
   state: () => ({
     party: {
-      id: null,
+      id: 0,
       name: '',
       players: '',
       mise: '',
       status: '',
       createdAt: '',
+      timer:60,
       updatedAt: ''
     },
   }),

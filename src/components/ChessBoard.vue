@@ -351,6 +351,7 @@ export default {
         }
       }
     },
+    
     getCellColor(row, col) {
       return (row + col) % 2 === 0 ? 'white-cell' : 'black-cell';
     },

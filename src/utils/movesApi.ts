@@ -109,7 +109,7 @@ export const getKingMoves = async (
 export const getKingRookMoves = async (
   row: number,
   col: number,
-  direction: string,
+  direction: number,
   kingMoved: boolean,
   isWhite: boolean,
   board: Board
